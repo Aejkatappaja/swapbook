@@ -77,3 +77,20 @@ jobs:
         with:
           php-version: "8.3"
       - run: php adapters/php/swapbook_test.php
+
+  smoke:
+    name: protocol smoke (python/node/ruby)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+      - run: bash examples/smoke.sh
