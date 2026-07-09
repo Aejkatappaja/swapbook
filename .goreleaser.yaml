@@ -1,0 +1,42 @@
+# Release config for GoReleaser v2. Cut a release by pushing a tag:
+#   git tag v0.1.0 && git push origin v0.1.0
+# The release workflow (.github/workflows/release.yml) runs this.
+version: 2
+
+project_name: swapbook
+
+builds:
+  - id: swapbook
+    main: ./cmd/swapbook
+    binary: swapbook
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: default
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+release:
+  github:
+    owner: Aejkatappaja
+    name: swapbook
