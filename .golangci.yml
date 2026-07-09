@@ -1,0 +1,10 @@
+version: "2"
+run:
+  timeout: 5m
+linters:
+  # standard set is errcheck + govet + ineffassign + staticcheck + unused.
+  default: standard
+  disable:
+    # ignored w.Write / io.Copy / Body.Close in HTTP handlers and tests are
+    # idiomatic here, not defects; errcheck only adds noise on this codebase.
+    - errcheck
