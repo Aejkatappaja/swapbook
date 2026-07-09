@@ -67,3 +67,13 @@ jobs:
         run: npm test
       - name: typecheck UI (JSDoc + checkJs)
         run: npx -y -p typescript tsc -p cmd/swapbook/ui/jsconfig.json
+
+  php:
+    name: php adapter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+      - run: php adapters/php/swapbook_test.php
