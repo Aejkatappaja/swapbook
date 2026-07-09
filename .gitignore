@@ -1,0 +1,10 @@
+# Go build output
+/swapbook
+/dist/
+
+# JS test tooling (dev-only; the shipped UI has no build step)
+test/ui/node_modules/
+node_modules/
+
+# Editor / OS
+.DS_Store
