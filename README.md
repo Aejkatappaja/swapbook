@@ -245,8 +245,8 @@ keyboard nav · copy-as-curl · swap-target highlight · canvas background toggl
 per-component autodocs · auto-reload on rebuild.
 
 Next: custom viewports, visual regression (screenshot + diff), play/interaction
-functions, distribution (Homebrew / `install.sh` / npx). See
-[SPEC.md#roadmap](SPEC.md#roadmap).
+functions, distribution (Homebrew / `install.sh` / npx). Tracked in
+[issues](https://github.com/Aejkatappaja/swapbook/issues).
 
 ## Status
 
