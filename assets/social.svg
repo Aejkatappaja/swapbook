@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="Swapbook social preview">
+  <defs>
+    <radialGradient id="g1" cx="0.82" cy="0.08" r="0.55">
+      <stop offset="0" stop-color="#82c9e0" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#82c9e0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g2" cx="0.12" cy="0.95" r="0.55">
+      <stop offset="0" stop-color="#b58cf0" stop-opacity="0.13"/>
+      <stop offset="1" stop-color="#b58cf0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#14161c"/>
+  <rect width="1200" height="630" fill="url(#g1)"/>
+  <rect width="1200" height="630" fill="url(#g2)"/>
+
+  <!-- mark, centered, scaled x3.4 (~109px) -->
+  <g transform="translate(545.6,150) scale(3.4)">
+    <path d="M8 12 H21" stroke="#82c9e0" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M17.5 8.5 L22 12 L17.5 15.5" fill="none" stroke="#82c9e0" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M24 20 H11" stroke="#d9b878" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M14.5 16.5 L10 20 L14.5 23.5" fill="none" stroke="#d9b878" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <text x="600" y="352" text-anchor="middle" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace" font-size="76" font-weight="700" letter-spacing="-1">
+    <tspan fill="#d9b878">~/</tspan><tspan fill="#82c9e0">swap</tspan><tspan fill="#d9b878">book</tspan>
+  </text>
+
+  <text x="600" y="430" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="40" font-weight="600" fill="#e7eaf2">Storybook for htmx &amp; hypermedia</text>
+
+  <text x="600" y="486" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="25" fill="#7d879f">one binary &#183; htmx-aware inspector &#183; any stack &#183; zero JS toolchain</text>
+</svg>
