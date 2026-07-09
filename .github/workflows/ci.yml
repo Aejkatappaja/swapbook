@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
-          cache: true
+          cache: false
       - name: gofmt
         run: |
           unformatted=$(gofmt -l .)
@@ -44,7 +44,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-          cache: true
+          cache: false
       - uses: golangci/golangci-lint-action@v7
         with:
           version: latest
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
-          cache: true
+          cache: false
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
