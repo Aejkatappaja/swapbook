@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>~/swapbook</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='8'%20fill='%2314161c'/%3E%3Cpath%20d='M8%2013H21'%20stroke='%2382c9e0'%20stroke-width='3.2'%20stroke-linecap='round'/%3E%3Cpath%20d='M17.5%209L22.5%2013L17.5%2017'%20fill='none'%20stroke='%2382c9e0'%20stroke-width='3.2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3Cpath%20d='M24%2019H11'%20stroke='%23d9b878'%20stroke-width='3.2'%20stroke-linecap='round'/%3E%3Cpath%20d='M14.5%2015L9.5%2019L14.5%2023'%20fill='none'%20stroke='%23d9b878'%20stroke-width='3.2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/__sb/style.css">
+</head>
+<body>
+<div class="glow glow-1"></div>
+<div class="glow glow-2"></div>
+
+<aside id="sidebar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+      <rect width="32" height="32" rx="8" fill="#14161c"/>
+      <path d="M8 13 H21" stroke="#82c9e0" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M17.5 9 L22.5 13 L17.5 17" fill="none" stroke="#82c9e0" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M24 19 H11" stroke="#d9b878" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M14.5 15 L9.5 19 L14.5 23" fill="none" stroke="#d9b878" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="brand-wm">~<span class="slash">/</span>swapbook</span>
+  </div>
+  <div class="brand-sub">// component workbench</div>
+  <input id="story-search" type="search" placeholder="filter stories…" autocomplete="off" spellcheck="false">
+  <nav id="stories">loading…</nav>
+  <div class="side-foot" id="status"><span class="dot ok">●</span> <span class="status-txt">ready</span></div>
+</aside>
+
+<main>
+  <header id="toolbar">
+    <span id="current"><span class="p">$</span> select a story</span>
+    <div class="tools">
+      <div class="seg"><span class="seg-label">mode</span><div class="modes" id="modes"></div></div>
+      <div class="seg"><span class="seg-label">width</span><div class="widths" id="widths"></div></div>
+      <div class="seg"><span class="seg-label">bg</span><div class="bgs" id="bgs"></div></div>
+      <button id="copy-link" title="copy a shareable link to this state">link ⧉</button>
+      <button id="open-tab" title="open preview in a new tab">open ↗</button>
+    </div>
+  </header>
+
+  <div id="controls" hidden></div>
+
+  <div id="stage">
+    <iframe id="preview" title="preview"></iframe>
+    <div id="autodocs" class="autodocs" hidden></div>
+    <div id="stage-error" hidden>
+      <div class="err-mark">✕</div>
+      <div class="err-title" id="err-title">target unreachable</div>
+      <div class="err-sub" id="err-sub">waiting for <code>your app</code> to come back… (auto-reloads)</div>
+    </div>
+  </div>
+
+  <section id="inspector">
+    <div class="ins-head">
+      <div class="tabs">
+        <button class="tab active" data-tab="net"><span class="mn">⇄</span> network</button>
+        <button class="tab" data-tab="a11y">a11y <span class="badge" id="a11yCount" hidden>0</span></button>
+        <button class="tab" data-tab="docs" id="docsTab" hidden>docs</button>
+      </div>
+      <button id="clear">clear</button>
+    </div>
+    <ol id="events" class="panel"></ol>
+    <ul id="a11y" class="panel" hidden></ul>
+    <div id="docs" class="panel" hidden></div>
+  </section>
+</main>
+
+<script src="/__sb/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+// @ts-check
+// Injected into every preview frame. Detects which hypermedia library the page
+// uses and attaches a matching "probe" that normalizes its network lifecycle
+// into a common shape ({verb, path, status, target, params}) forwarded to the
+// Swapbook chrome via postMessage. Probes also apply mock/safe-mode behavior.
+//
+// Coverage: htmx is full (mock rewrite + mutation blocking + rich logging).
+// Turbo, Unpoly and Datastar (fetch-based) get normalized logging plus
+// best-effort mock rewrite / blocking, since each library intercepts requests
+// differently. New libraries are added by writing another probe.
+(function () {
+  var W = /** @type {any} */ (window);
+  var cfg = W.__SB || {};
+  var mode = cfg.mode === "safe" || cfg.mode === "live" ? cfg.mode : "mock";
+  var mocks = cfg.mocks || {};
+  var MUTATING = { POST: 1, PUT: 1, DELETE: 1, PATCH: 1 };
+
+  var seq = 0;
+  function send(event, data) {
+    try {
+      parent.postMessage({ source: "swapbook", seq: seq++, event: event, data: data || {} }, "*");
+    } catch (_) {}
+  }
+
+  function up(v) {
+    return (v || "").toUpperCase();
+  }
+
+  // flash: briefly outline the element a response was swapped into.
+  function flash(el) {
+    if (!el || !el.style) return;
+    var prev = el.style.outline, prevOff = el.style.outlineOffset;
+    el.style.transition = "outline 120ms ease";
+    el.style.outline = "2px solid #82c9e0";
+    el.style.outlineOffset = "2px";
+    setTimeout(function () {
+      el.style.outline = prev;
+      el.style.outlineOffset = prevOff;
+    }, 750);
+  }
+
+  var reqTimes = []; // FIFO of request start times, for latency
+
+  function pathOf(u) {
+    try {
+      return new URL(u, location.origin).pathname;
+    } catch (_) {
+      return String(u || "");
+    }
+  }
+
+  function eltDesc(el) {
+    if (!el || !el.tagName) return "";
+    var s = el.tagName.toLowerCase();
+    if (el.id) s += "#" + el.id;
+    var attrs = ["hx-get", "hx-post", "hx-put", "hx-delete", "hx-target", "hx-swap"];
+    attrs.forEach(function (a) {
+      if (el.getAttribute && el.getAttribute(a)) s += " " + a + '="' + el.getAttribute(a) + '"';
+    });
+    return s;
+  }
+
+  // Normalize htmx/other request parameters (FormData or plain object).
+  function paramsToObj(p) {
+    if (!p) return null;
+    var o = {};
+    if (typeof p.forEach === "function" && typeof p.entries === "function") {
+      p.forEach(function (v, k) {
+        o[k] = typeof v === "string" ? v : "[file]";
+      });
+    } else if (typeof p === "object") {
+      for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k)) o[k] = p[k];
+    }
+    return Object.keys(o).length ? o : null;
+  }
+
+  // A request already rerouted to a mock endpoint must never be blocked.
+  function isMockPath(path) {
+    return (path || "").indexOf("/__sb/mock/") === 0;
+  }
+
+  // shouldBlock: outside live mode, unmocked mutating requests are cancelled.
+  function shouldBlock(verb, path) {
+    return mode !== "live" && !isMockPath(path) && MUTATING[up(verb)];
+  }
+
+  // mockFor returns the mock overlay URL for a "VERB /path", if declared.
+  function mockFor(verb, path) {
+    return mode === "mock" ? mocks[up(verb) + " " + path] : undefined;
+  }
+
+  // gate applies the mock/safe policy for a request and logs it. Returns
+  // { mock: url } to reroute, { block: true } to cancel, or {} to let through.
+  // Non-htmx probes share this so the policy lives in one place; each supplies
+  // its own reroute/cancel mechanics.
+  function gate(verb, path, lib) {
+    var url = mockFor(verb, path);
+    if (url) {
+      send("mock", { verb: verb, path: path, lib: lib });
+      return { mock: url };
+    }
+    if (shouldBlock(verb, path)) {
+      send("blocked", { verb: verb, path: path, lib: lib });
+      return { block: true };
+    }
+    return {};
+  }
+
+  // Contain navigation: a full-page component ships real <a href> / <form>
+  // that would navigate the preview iframe across the whole (proxied) app,
+  // escaping the story and losing the inspector. Outside live mode, cancel
+  // native navigations and log them. htmx-driven links/forms are left to the
+  // probes (they gate those). Live mode lets you roam the real app.
+  function htmxDriven(el) {
+    return !!(
+      el.closest("[hx-boost]") ||
+      el.hasAttribute("hx-get") || el.hasAttribute("hx-post") ||
+      el.hasAttribute("hx-put") || el.hasAttribute("hx-delete") || el.hasAttribute("hx-patch")
+    );
+  }
+  document.addEventListener("click", function (/** @type {any} */ e) {
+    if (mode === "live" || !e.target.closest) return;
+    var a = e.target.closest("a[href]");
+    if (!a) return;
+    var href = a.getAttribute("href");
+    if (!href || href[0] === "#" || href.indexOf("javascript:") === 0 || a.target === "_blank") return;
+    if (htmxDriven(a)) return;
+    e.preventDefault();
+    send("nav", { path: href });
+  }, true);
+  document.addEventListener("submit", function (/** @type {any} */ e) {
+    if (mode === "live") return;
+    var f = e.target;
+    if (htmxDriven(f)) return;
+    e.preventDefault();
+    send("nav", { verb: up(f.method || "GET"), path: f.getAttribute("action") || "" });
+  }, true);
+
+  // ---- Probes -------------------------------------------------------------
+
+  var htmxProbe = {
+    name: "htmx",
+    detect: function () {
+      return !!W.htmx;
+    },
+    attach: function () {
+      // reroute matching requests to their mock endpoint before htmx sends them
+      document.addEventListener("htmx:configRequest", function (/** @type {any} */ e) {
+        var url = mockFor(e.detail.verb, e.detail.path);
+        if (url) {
+          send("mock", { verb: up(e.detail.verb), path: e.detail.path, lib: "htmx" });
+          e.detail.path = url;
+        }
+      });
+      // block unmocked mutations
+      document.addEventListener("htmx:beforeRequest", function (/** @type {any} */ e) {
+        var rc = e.detail.requestConfig || {};
+        if (shouldBlock(rc.verb, rc.path)) {
+          e.preventDefault();
+          send("blocked", { verb: up(rc.verb), path: rc.path, target: eltDesc(e.detail.target), params: paramsToObj(rc.parameters), lib: "htmx" });
+        }
+      });
+      // rich logging
+      ["beforeRequest", "afterRequest", "beforeSwap", "afterSwap", "responseError"].forEach(function (n) {
+        document.addEventListener("htmx:" + n, function (/** @type {any} */ e) {
+          var d = e.detail || {};
+          // a blocked request is logged once as "blocked" by the gate above;
+          // skip the duplicate beforeRequest row (and its unmatched timing push).
+          if (n === "beforeRequest" && d.requestConfig && shouldBlock(d.requestConfig.verb, d.requestConfig.path)) return;
+          var out = { lib: "htmx" };
+          if (d.requestConfig) {
+            out.verb = up(d.requestConfig.verb);
+            out.path = d.requestConfig.path;
+            out.params = paramsToObj(d.requestConfig.parameters);
+          }
+          if (d.pathInfo && d.pathInfo.requestPath) out.path = d.pathInfo.requestPath;
+          if (d.xhr) out.status = d.xhr.status;
+          if (d.target) out.target = eltDesc(d.target);
+          if (n === "beforeRequest") reqTimes.push(performance.now());
+          if (n === "afterRequest") {
+            var t0 = reqTimes.shift();
+            if (t0 != null) out.ms = Math.round(performance.now() - t0);
+          }
+          if (n === "beforeSwap" && typeof d.serverResponse === "string") {
+            out.responseBytes = d.serverResponse.length;
+            out.response = d.serverResponse.slice(0, 6000);
+          }
+          if (n === "afterSwap") flash(d.target);
+          send(n, out);
+        });
+      });
+    },
+  };
+
+  var turboProbe = {
+    name: "turbo",
+    detect: function () {
+      return !!W.Turbo;
+    },
+    attach: function () {
+      document.addEventListener("turbo:before-fetch-request", function (/** @type {any} */ e) {
+        var d = e.detail || {};
+        var verb = up((d.fetchOptions && d.fetchOptions.method) || "GET");
+        var path = pathOf(d.url);
+        var g = gate(verb, path, "turbo");
+        if (g.mock) {
+          try { d.url = new URL(g.mock, location.origin); } catch (_) {}
+        } else if (g.block) {
+          if (e.cancelable) e.preventDefault();
+          return;
+        }
+        send("beforeRequest", { verb: verb, path: path, lib: "turbo" });
+      });
+      document.addEventListener("turbo:before-fetch-response", function (/** @type {any} */ e) {
+        var r = e.detail && e.detail.fetchResponse;
+        send("afterRequest", { status: r && r.response && r.response.status, lib: "turbo" });
+      });
+    },
+  };
+
+  var unpolyProbe = {
+    name: "unpoly",
+    detect: function () {
+      return !!(W.up && W.up.on);
+    },
+    attach: function () {
+      W.up.on("up:request:load", function (event) {
+        var req = event.request || {};
+        var verb = up(req.method || "GET");
+        var path = pathOf(req.url);
+        var g = gate(verb, path, "unpoly");
+        if (g.mock) {
+          try { req.url = g.mock; } catch (_) {}
+        } else if (g.block) {
+          if (event.preventDefault) event.preventDefault();
+          return;
+        }
+        send("beforeRequest", { verb: verb, path: path, lib: "unpoly" });
+      });
+      W.up.on("up:request:loaded", function (event) {
+        var resp = event.response || {};
+        send("afterRequest", { status: resp.status, lib: "unpoly" });
+      });
+    },
+  };
+
+  // Datastar and other fetch-based libraries: wrap fetch. htmx uses XHR, so
+  // this does not double-count htmx traffic.
+  var datastarProbe = {
+    name: "datastar",
+    detect: function () {
+      return !!(W.Datastar || document.querySelector("[data-signals],[data-on-load],[data-star]"));
+    },
+    attach: function () {
+      var orig = window.fetch;
+      if (!orig) return;
+      window.fetch = function (/** @type {any} */ input, init) {
+        var raw = typeof input === "string" ? input : (input && input.url) || "";
+        var verb = up((init && init.method) || (input && input.method) || "GET");
+        var path = pathOf(raw);
+        var g = gate(verb, path, "datastar");
+        if (g.mock) {
+          send("beforeRequest", { verb: verb, path: path, lib: "datastar" });
+          return orig(g.mock, init);
+        }
+        if (g.block) return Promise.reject(new Error("blocked by swapbook (" + mode + " mode)"));
+        send("beforeRequest", { verb: verb, path: path, lib: "datastar" });
+        return orig(input, init).then(function (r) {
+          send("afterRequest", { status: r.status, lib: "datastar" });
+          return r;
+        });
+      };
+    },
+  };
+
+  // ---- a11y lint (dependency-free; axe-core is a future drop-in) ----------
+  function runA11y() {
+    var v = [];
+    document.querySelectorAll("img:not([alt])").forEach(function (el) {
+      v.push({ rule: "img-alt", msg: "image has no alt text", target: eltDesc(el) });
+    });
+    document.querySelectorAll("button, a[href]").forEach(function (el) {
+      var name = (el.textContent || "").trim() || el.getAttribute("aria-label") || el.getAttribute("title");
+      if (!name) v.push({ rule: "name", msg: el.tagName.toLowerCase() + " has no accessible label", target: eltDesc(el) });
+    });
+    document.querySelectorAll("input, select, textarea").forEach(function (el) {
+      var t = (el.getAttribute("type") || "").toLowerCase();
+      if (t === "hidden" || t === "submit" || t === "button") return;
+      var labelled =
+        el.getAttribute("aria-label") ||
+        el.getAttribute("aria-labelledby") ||
+        el.getAttribute("title") ||
+        el.closest("label") ||
+        (el.id && document.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(el.id) : el.id) + '"]'));
+      if (!labelled) v.push({ rule: "label", msg: "form control has no label (placeholder is not a label)", target: eltDesc(el) });
+    });
+    var seen = {};
+    document.querySelectorAll("[id]").forEach(function (el) {
+      if (seen[el.id]) v.push({ rule: "dup-id", msg: 'duplicate id "' + el.id + '"', target: eltDesc(el) });
+      seen[el.id] = true;
+    });
+    send("a11y", { violations: v });
+  }
+  // report content height so the chrome can auto-size autodocs mini-previews
+  function reportHeight() {
+    try {
+      // body.scrollHeight is the CONTENT height; documentElement.scrollHeight
+      // would report at least the iframe's own viewport (self-referential),
+      // leaving dead space below short fragments.
+      var b = document.body;
+      if (b) send("height", { h: b.scrollHeight + 16 }); // +margin buffer
+    } catch (_) {}
+  }
+
+  // re-lint + re-measure whenever the DOM changes, regardless of which library
+  // performed the swap (htmx/Turbo/Unpoly/Datastar all mutate the DOM).
+  var changeT;
+  function onContentChange() {
+    clearTimeout(changeT);
+    changeT = setTimeout(function () {
+      runA11y();
+      reportHeight();
+    }, 120);
+  }
+
+  // ---- Wire up ------------------------------------------------------------
+
+  var PROBES = [htmxProbe, turboProbe, unpolyProbe, datastarProbe];
+
+  // Wire probes after DOMContentLoaded: deferred library scripts (e.g. a
+  // <script src="htmx.js" defer>) have executed by then, so detection sees
+  // W.htmx/Turbo/up. Request events fire on later user interaction, so
+  // attaching now never misses anything.
+  function wire() {
+    var attached = [];
+    PROBES.forEach(function (p) {
+      if (p.detect()) {
+        p.attach();
+        attached.push(p.name);
+      }
+    });
+    send("frame:ready", { mode: mode, libs: attached });
+    onContentChange();
+    if (document.body && window.MutationObserver) {
+      new MutationObserver(onContentChange).observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", wire);
+  } else {
+    wire();
+  }
+})();
