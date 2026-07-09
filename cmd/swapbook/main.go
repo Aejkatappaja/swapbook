@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"runtime/debug"
 
 	"github.com/Aejkatappaja/swapbook/internal/server"
 )
@@ -20,8 +21,24 @@ import (
 //go:embed ui/*
 var uiFS embed.FS
 
-// version is stamped at build time via -ldflags "-X main.version=...".
+// version is stamped at build time via -ldflags "-X main.version=..." (release
+// builds). Left as "dev" otherwise.
 var version = "dev"
+
+// resolvedVersion prefers the ldflags value, then falls back to the module
+// version recorded by the Go toolchain, so "go install ...@v0.1.0" also reports
+// a real version instead of "dev".
+func resolvedVersion() string {
+	if version != "dev" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		if v := bi.Main.Version; v != "" && v != "(devel)" {
+			return v
+		}
+	}
+	return version
+}
 
 func main() {
 	target := flag.String("target", ":8080", "target app address (host:port or URL)")
@@ -30,7 +47,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println("swapbook", version)
+		fmt.Println("swapbook", resolvedVersion())
 		return
 	}
 
