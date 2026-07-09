@@ -1,0 +1,8 @@
+{
+  "name": "swapbook-ui-tests",
+  "private": true,
+  "type": "module",
+  "description": "Dev-only tests for the Swapbook browser UI (jsdom). Not part of the shipped zero-build UI.",
+  "scripts": { "test": "node --test" },
+  "devDependencies": { "jsdom": "^24" }
+}
