@@ -268,6 +268,22 @@ Early. The protocol is proven across seven stacks with tests: Go/templ, Django,
 Rails and Laravel via adapters, plus dependency-free Python, Node and Ruby
 targets. Interfaces may still shift before a tagged release.
 
+## Limitations
+
+Swapbook is early and deliberately scoped. Known edges:
+
+- **htmx is the verified path.** The Turbo, Unpoly and Datastar inspector probes
+  are best-effort and not yet exercised against real apps.
+- **SSE and WebSocket** connections are proxied through, but the inspector does
+  not visualize their events (there is no discrete request to trace).
+- **Mocks are stateless.** A declared route returns a fixed response, so
+  multi-step flows whose output depends on earlier steps are out of scope.
+- **CSP is stripped from proxied responses** so previews can be framed and
+  instrumented. Swapbook is a local dev tool pointed at an app you own; it is not
+  a public proxy.
+- **Relative asset paths** inside a bare fragment may not resolve; prefer
+  app-absolute paths like `/static/...`.
+
 ## License
 
 MIT.
