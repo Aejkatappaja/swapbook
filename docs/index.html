@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Storybook for htmx & hypermedia. One binary reverse-proxies your running app and renders your components in isolation, with an htmx-aware inspector, live controls and mocked interactions. Zero JS toolchain.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Swapbook · Storybook for htmx">
+<meta property="og:description" content="Storybook for htmx & hypermedia. One binary reverse-proxies your running app and renders your components in isolation, with an htmx-aware inspector, live controls and mocked interactions. Zero JS toolchain.">
+<meta property="og:url" content="https://aejkatappaja.github.io/swapbook/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%94%80</text></svg>">
+<title>Swapbook · Storybook for htmx</title>
+<style>
+  /* ---- sora tokens (dark-committed: this is a terminal workbench) ---- */
+  :root {
+    --ink: #14161c;
+    --panel: #191c24;
+    --elev: #20242e;
+    --line: #2b3140;
+    --line-soft: #232833;
+    --fg: #e7eaf2;
+    --fg-dim: #aeb7cc;
+    --comment: #7d879f;
+    --cyan: #82c9e0;   /* in / new  */
+    --gold: #d9b878;   /* out / old */
+    --purple: #b58cf0; /* accent, sparing */
+    --sage: #9ece9a;   /* ok / 200  */
+    --rose: #e08aa0;   /* blocked   */
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Cascadia Code", monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --maxw: 1140px;
+    --r: 10px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  /* ambient: faint glow blobs + scanlines + grain, all non-interactive */
+  .amb { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .amb.glow {
+    background:
+      radial-gradient(42rem 30rem at 78% -8%, color-mix(in oklab, var(--cyan) 16%, transparent), transparent 60%),
+      radial-gradient(38rem 28rem at 10% 8%, color-mix(in oklab, var(--purple) 13%, transparent), transparent 60%);
+  }
+  .amb.scan {
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.014) 0 1px, transparent 1px 3px);
+    mix-blend-mode: overlay; opacity: .6;
+  }
+  .amb.grain {
+    opacity: .04;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 3px; }
+
+  /* ---- top bar ---- */
+  header {
+    position: sticky; top: 0; z-index: 20;
+    backdrop-filter: blur(10px);
+    background: color-mix(in oklab, var(--ink) 82%, transparent);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .bar { display: flex; align-items: center; gap: 20px; height: 56px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; letter-spacing: .01em; }
+  .brand .mk { width: 22px; height: 22px; display: grid; place-items: center; }
+  .brand .home { color: var(--gold); }
+  .brand .home .sl { color: var(--cyan); }
+  .nav { margin-left: auto; display: flex; align-items: center; gap: 22px; font-size: 13.5px; }
+  .nav a { color: var(--fg-dim); }
+  .nav a:hover { color: var(--fg); text-decoration: none; }
+  .pill {
+    font-size: 11.5px; color: var(--comment);
+    border: 1px solid var(--line); border-radius: 100px; padding: 2px 9px;
+  }
+  .gh {
+    color: var(--fg); border: 1px solid var(--line); border-radius: 7px;
+    padding: 5px 12px; font-size: 13px;
+  }
+  .gh:hover { border-color: var(--cyan); text-decoration: none; }
+
+  /* ---- hero ---- */
+  .hero { padding: 60px 0 24px; display: flex; flex-direction: column; gap: 44px; }
+  .hero > * { min-width: 0; }
+  .hero-copy { max-width: 780px; }
+  .demo { display: flex; flex-direction: column; gap: 11px; }
+  .demo-cap { color: var(--comment); font-size: 12.5px; letter-spacing: .02em; }
+  .demo-cap .mn { color: var(--cyan); }
+  .eyebrow { color: var(--comment); font-size: 13px; letter-spacing: .04em; margin-bottom: 18px; }
+  .eyebrow b { color: var(--purple); font-weight: 400; }
+  h1 {
+    font-family: var(--mono); font-weight: 680;
+    font-size: clamp(1.72rem, 6.4vw, 3.35rem); line-height: 1.07;
+    letter-spacing: -.02em; margin: 0 0 20px; text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+  h1 .in { color: var(--cyan); }
+  h1 .out { color: var(--gold); }
+  .lede { font-family: var(--sans); color: var(--fg-dim); font-size: 16.5px; line-height: 1.65; max-width: 42ch; margin: 0 0 28px; }
+  .lede b { color: var(--fg); font-weight: 600; }
+
+  .install { display: flex; flex-direction: column; gap: 8px; margin-bottom: 26px; }
+  .cmd {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 9px; padding: 11px 14px; font-size: 13.5px;
+  }
+  .cmd .dol { color: var(--sage); user-select: none; }
+  .cmd code { color: var(--fg); overflow-x: auto; white-space: nowrap; flex: 1; min-width: 0; }
+  .cmd .copy {
+    background: none; border: 1px solid var(--line); color: var(--fg-dim);
+    border-radius: 6px; padding: 3px 8px; font-family: var(--mono); font-size: 11.5px; cursor: pointer;
+  }
+  .cmd .copy:hover { border-color: var(--cyan); color: var(--cyan); }
+  .cmd.sub { background: transparent; border-color: var(--line-soft); color: var(--comment); }
+  .cmd.sub code { color: var(--fg-dim); }
+
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn-cta {
+    font-family: var(--mono); font-size: 14px; cursor: pointer;
+    padding: 10px 18px; border-radius: 8px; border: 1px solid transparent;
+  }
+  .btn-cta.primary { background: var(--cyan); color: #0b1015; font-weight: 600; }
+  .btn-cta.primary:hover { text-decoration: none; filter: brightness(1.06); }
+  .btn-cta.ghost { background: color-mix(in oklab, var(--fg) 5%, transparent); border-color: color-mix(in oklab, var(--fg) 22%, var(--line)); color: var(--fg); }
+  .btn-cta.ghost:hover { border-color: var(--cyan); background: color-mix(in oklab, var(--cyan) 10%, transparent); text-decoration: none; }
+
+  /* ---- workbench (the thesis) ---- */
+  .wb {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 30px 70px -30px rgba(0,0,0,.7), 0 0 0 1px rgba(130,201,224,.04) inset;
+  }
+  .wb-top { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); background: color-mix(in oklab, var(--elev) 60%, transparent); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .wb-top .title { margin-left: 8px; font-size: 12.5px; color: var(--comment); }
+  .wb-top .title b { color: var(--gold); font-weight: 500; }
+  .wb-top .title .sl { color: var(--cyan); }
+  .wb-modes { margin-left: auto; display: flex; gap: 5px; }
+  .chip {
+    font-family: var(--mono); font-size: 11px; cursor: pointer;
+    background: transparent; border: 1px solid var(--line); color: var(--fg-dim);
+    border-radius: 6px; padding: 3px 8px;
+  }
+  .chip[aria-pressed="true"] { border-color: var(--sage); color: var(--sage); background: color-mix(in oklab, var(--sage) 12%, transparent); }
+
+  .wb-body { display: grid; grid-template-columns: 172px 1fr 1.15fr; min-height: 356px; }
+  .wb-nav { border-right: 1px solid var(--line-soft); padding: 12px 0; font-size: 12.5px; overflow-y: auto; }
+  .wb-group { color: var(--comment); padding: 4px 14px; font-size: 10.5px; letter-spacing: .06em; text-transform: lowercase; }
+  .wb-group::before { content: "// "; }
+  .wb-var {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    background: none; border: 0; color: var(--fg-dim); font-family: var(--mono); font-size: 12.5px;
+    padding: 5px 14px 5px 22px; position: relative;
+  }
+  .wb-var::before { content: "▸"; position: absolute; left: 10px; color: var(--line); }
+  .wb-var:hover { color: var(--fg); background: var(--line-soft); }
+  .wb-var[aria-current="true"] { color: var(--cyan); }
+  .wb-var[aria-current="true"]::before { content: "▸"; color: var(--cyan); }
+
+  .wb-stage {
+    border-right: 1px solid var(--line-soft); padding: 20px;
+    display: flex; flex-direction: column; gap: 14px;
+    background:
+      linear-gradient(color-mix(in oklab, var(--ink) 40%, transparent), transparent),
+      repeating-conic-gradient(var(--line-soft) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
+    background-blend-mode: normal;
+  }
+  .wb-canvas { flex: 1; display: flex; flex-direction: column; gap: 12px; align-items: center; justify-content: center; }
+  .wb-ctrls { border-top: 1px dashed var(--line); padding-top: 10px; display: none; flex-direction: column; gap: 7px; }
+  .wb-ctrls.on { display: flex; }
+  .wb-ctrls label { font-size: 10.5px; color: var(--comment); display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+  .wb-ctrls input, .wb-ctrls select {
+    font-family: var(--mono); font-size: 11.5px; background: var(--ink); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 5px; padding: 3px 7px; width: 128px;
+  }
+
+  .wb-insp { padding: 0; display: flex; flex-direction: column; min-width: 0; }
+  .itabs { display: flex; align-items: center; gap: 13px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); font-size: 11px; }
+  .itab { background: none; border: 0; color: var(--comment); font-family: var(--mono); font-size: 11px; cursor: pointer; padding: 0; }
+  .itab.active { color: var(--cyan); }
+  .itab .mn { color: inherit; }
+  .ibadge { background: var(--line); color: var(--fg-dim); border-radius: 100px; padding: 0 6px; font-size: 9.5px; margin-left: 2px; }
+  .iclear { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--comment); border-radius: 5px; font-family: var(--mono); font-size: 10px; padding: 2px 8px; cursor: pointer; }
+  .iclear:hover { border-color: var(--cyan); color: var(--cyan); }
+  .ipanel[hidden] { display: none !important; }
+  .wb-log { list-style: none; margin: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 11.5px; overflow-y: auto; max-height: 372px; }
+  .a11y, .docs { padding: 12px; font-size: 11.5px; }
+  .a11y { color: var(--sage); }
+  .docs { color: var(--fg-dim); font-family: var(--sans); line-height: 1.55; }
+  .docs code { color: var(--cyan); font-family: var(--mono); font-size: 11px; }
+  .lg { border-left: 2px solid var(--line); padding: 1px 0 2px 9px; animation: slidein .18s ease; }
+  .lg.blk { border-left-color: var(--rose); }
+  .lg.mck { border-left-color: var(--purple); }
+  .lg-a { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .lg-b { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 3px; font-size: 10.5px; }
+  .ev { color: var(--comment); }
+  .verb { color: var(--gold); }
+  .path { color: var(--cyan); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .note { color: var(--comment); }
+  .st { font-variant-numeric: tabular-nums; }
+  .st.ok { color: var(--sage); background: color-mix(in oklab, var(--sage) 15%, transparent); border-radius: 4px; padding: 0 5px; font-size: 10.5px; }
+  .st.bad { color: var(--rose); }
+  .tgt { color: var(--fg-dim); }
+  .ms, .by { color: var(--comment); font-variant-numeric: tabular-nums; }
+  .chipx { background: none; border: 1px solid var(--line); color: var(--comment); border-radius: 4px; font-family: var(--mono); font-size: 9.5px; padding: 1px 6px; cursor: pointer; }
+  .chipx:hover { border-color: var(--cyan); color: var(--cyan); }
+  .vrb { margin: 5px 0 0; background: var(--ink); border: 1px solid var(--line-soft); border-radius: 5px; padding: 6px 8px; font-size: 10.5px; color: var(--fg-dim); overflow-x: auto; }
+
+  /* demo component styles (scoped, stylized for the dark canvas) */
+  .wb-canvas > * { width: 100%; max-width: 280px; }
+  .wb-canvas .btn { font-family: var(--sans); font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 7px; border: 1px solid transparent; cursor: pointer; width: auto; }
+  .wb-canvas .btn-primary { background: var(--cyan); color: #0b1015; box-shadow: 0 6px 18px -8px color-mix(in oklab, var(--cyan) 70%, transparent); }
+  .wb-canvas .btn-secondary { background: transparent; color: var(--fg); border-color: var(--line); }
+  .wb-canvas .btn-danger { background: var(--rose); color: #1a0c11; }
+  .wb-canvas .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+  .wb-canvas .badge { font-family: var(--sans); font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; }
+  .wb-canvas .badge-open { background: color-mix(in oklab, var(--sage) 20%, transparent); color: var(--sage); }
+  .wb-canvas .badge-merged { background: color-mix(in oklab, var(--purple) 22%, transparent); color: var(--purple); }
+  .wb-canvas .badge-closed { background: color-mix(in oklab, var(--rose) 20%, transparent); color: var(--rose); }
+
+  /* card: avatar + meta */
+  .wb-canvas .card { font-family: var(--sans); background: var(--elev); border: 1px solid var(--line); border-radius: 12px; padding: 15px; }
+  .wb-canvas .card .top { display: flex; gap: 10px; align-items: center; }
+  .wb-canvas .avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 700; font-size: 12.5px; color: #0b1015; background: linear-gradient(135deg, var(--cyan), var(--purple)); }
+  .wb-canvas .card .who { line-height: 1.25; }
+  .wb-canvas .card .who strong { font-size: 13.5px; display: block; }
+  .wb-canvas .card .who span { font-size: 11.5px; color: var(--comment); }
+  .wb-canvas .card .top .badge { margin-left: auto; }
+  .wb-canvas .card .title2 { font-size: 13px; margin: 11px 0 0; }
+  .wb-canvas .card .foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .wb-canvas .card .rev { font-size: 11.5px; color: var(--comment); margin-left: auto; }
+
+  /* stat tile + sparkline */
+  .wb-canvas .stat { font-family: var(--sans); background: var(--elev); border: 1px solid var(--line); border-radius: 12px; padding: 15px; }
+  .wb-canvas .stat .lbl { font-size: 10.5px; color: var(--comment); letter-spacing: .05em; text-transform: uppercase; }
+  .wb-canvas .stat .num { font-size: 27px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .wb-canvas .stat .delta { color: var(--sage); font-size: 12px; }
+  .wb-canvas .stat svg { display: block; margin-top: 10px; width: 100%; height: 40px; overflow: visible; }
+
+  /* skeleton shimmer */
+  .wb-canvas .sk { background: var(--elev); border: 1px solid var(--line); border-radius: 12px; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+  .wb-canvas .sk .row { display: flex; gap: 10px; align-items: center; }
+  .wb-canvas .sk .col { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+  .wb-canvas .bar { height: 10px; border-radius: 6px; background: var(--line); background-image: linear-gradient(100deg, transparent 34%, color-mix(in oklab, var(--cyan) 26%, transparent) 50%, transparent 66%); background-size: 220% 100%; animation: shimmer 1.25s linear infinite; }
+  .wb-canvas .bar.circle { width: 34px; height: 34px; border-radius: 50%; flex: none; }
+
+  /* todo (the interactive star) */
+  .wb-canvas .todo { font-family: var(--sans); }
+  .wb-canvas .todo ul { list-style: none; margin: 0 0 11px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .wb-canvas .todo li { background: var(--elev); border: 1px solid var(--line); border-radius: 7px; padding: 7px 11px; font-size: 12.5px; }
+  .wb-canvas .todo li::before { content: "◦"; color: var(--cyan); margin-right: 8px; }
+  .wb-canvas .todo li.flash { animation: flash 750ms ease; }
+  .wb-canvas .todo .row { display: flex; gap: 8px; }
+
+  @keyframes flash { 0% { outline: 2px solid var(--cyan); outline-offset: 3px; } 100% { outline: 2px solid transparent; outline-offset: 3px; } }
+  @keyframes slidein { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -60% 0; } }
+
+  /* ---- generic section ---- */
+  section { padding: 46px 0; position: relative; z-index: 1; }
+  .sec-head { margin-bottom: 26px; }
+  .sec-head .k { color: var(--comment); font-size: 12px; letter-spacing: .05em; }
+  .sec-head .k::before { content: "// "; }
+  h2 { font-family: var(--mono); font-weight: 640; font-size: clamp(1.4rem, 2.6vw, 1.9rem); letter-spacing: -.01em; margin: 6px 0 0; }
+
+  .feats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .feat { background: var(--panel); border: 1px solid var(--line-soft); border-radius: var(--r); padding: 16px; }
+  .feat .fi { color: var(--cyan); font-size: 17px; margin-bottom: 9px; }
+  .feat h3 { font-size: 13.5px; margin: 0 0 6px; font-weight: 600; }
+  .feat p { font-family: var(--sans); font-size: 13px; color: var(--fg-dim); margin: 0; line-height: 1.55; }
+
+  /* quickstart tabs */
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tab { font-family: var(--mono); font-size: 13px; cursor: pointer; background: transparent; border: 1px solid var(--line-soft); color: var(--fg-dim); border-radius: 7px 7px 0 0; padding: 7px 14px; }
+  .tab[aria-selected="true"] { color: var(--cyan); border-color: var(--line); border-bottom-color: transparent; background: var(--panel); }
+  pre { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 0 10px 10px 10px; padding: 18px 20px; overflow-x: auto; font-size: 13px; line-height: 1.65; }
+  pre code { color: var(--fg); }
+  .tok-k { color: var(--purple); } .tok-s { color: var(--sage); } .tok-f { color: var(--cyan); } .tok-c { color: var(--comment); }
+
+  /* protocol */
+  .proto { display: grid; grid-template-columns: 1.3fr 1fr; gap: 22px; align-items: start; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { color: var(--comment); font-weight: 500; font-size: 11.5px; letter-spacing: .04em; }
+  td code { color: var(--cyan); }
+  td .req { color: var(--gold); font-size: 10px; }
+  /* animated flow: browser -> swapbook -> your app */
+  .flow { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; }
+  .node { border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px; background: var(--elev); }
+  .node .n-t { font-family: var(--mono); font-size: 12.5px; }
+  .node .n-s { font-family: var(--sans); font-size: 11px; color: var(--comment); margin-top: 1px; }
+  .node.browser .n-t { color: var(--purple); }
+  .node.sb .n-t { color: var(--cyan); }
+  .node.app .n-t { color: var(--gold); }
+  .link { height: 30px; margin-left: 20px; border-left: 2px dashed var(--line); position: relative; }
+  .link .dot { position: absolute; left: -5px; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px 1px color-mix(in oklab, var(--cyan) 70%, transparent); animation: flowdot 2.8s cubic-bezier(.5,0,.5,1) infinite; }
+  .link .dot.d2 { animation-delay: 1.4s; background: var(--gold); box-shadow: 0 0 10px 1px color-mix(in oklab, var(--gold) 70%, transparent); }
+  @keyframes flowdot { 0% { top: -4px; opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { top: 26px; opacity: 0; } }
+
+  /* compare */
+  .cmp { border: 1px solid var(--line-soft); border-radius: 12px; overflow: hidden; }
+  .cmp td, .cmp th { text-align: center; border-bottom: 1px solid var(--line-soft); }
+  .cmp tbody tr:last-child td { border-bottom: 0; }
+  .cmp td:first-child, .cmp th:first-child { text-align: left; color: var(--fg); padding-left: 16px; }
+  /* accent the Swapbook column as a vertical band */
+  .cmp th:nth-child(2), .cmp td:nth-child(2) { background: color-mix(in oklab, var(--cyan) 7%, transparent); box-shadow: inset 1px 0 0 color-mix(in oklab, var(--cyan) 22%, transparent), inset -1px 0 0 color-mix(in oklab, var(--cyan) 22%, transparent); }
+  .cmp thead th:nth-child(2) { color: var(--cyan); font-weight: 700; }
+  .cmp tbody tr:hover td { background: color-mix(in oklab, var(--fg) 3%, transparent); }
+  .cmp tbody tr:hover td:nth-child(2) { background: color-mix(in oklab, var(--cyan) 12%, transparent); }
+  .yes { color: var(--sage); font-weight: 700; } .no { color: var(--comment); } .part { color: var(--gold); font-size: 12px; }
+
+  footer { border-top: 1px solid var(--line-soft); padding: 30px 0 50px; color: var(--comment); font-size: 12.5px; }
+  .foot { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .foot .sp { margin-left: auto; }
+
+  @media (max-width: 900px) {
+    .hero { gap: 32px; padding-top: 40px; }
+    .feats { grid-template-columns: repeat(2, 1fr); }
+    .proto { grid-template-columns: 1fr; }
+    .wb-body { grid-template-columns: 116px 1fr; }
+    .wb-insp { display: none; }
+    .nav { gap: 14px; }
+    .nav .hide, .nav .pill { display: none; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    .feats { grid-template-columns: 1fr; }
+    .bar { gap: 12px; }
+    .brand .home { font-size: 14px; }
+    h1 { font-size: clamp(1.55rem, 8vw, 2.2rem); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="amb glow"></div>
+<div class="amb scan"></div>
+<div class="amb grain"></div>
+
+<header>
+  <div class="wrap bar">
+    <div class="brand">
+      <span class="mk" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M4 9h13l-3.4-3.4" stroke="#82c9e0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M20 15H7l3.4 3.4" stroke="#d9b878" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="home">~/<span class="sl">swap</span>book</span>
+    </div>
+    <nav class="nav">
+      <a href="#quickstart">quickstart</a>
+      <a href="docs.html">docs</a>
+      <a href="#protocol" class="hide">protocol</a>
+      <a href="#compare" class="hide">compare</a>
+      <span class="pill">v0.1 · MIT</span>
+      <a class="gh" href="https://github.com/Aejkatappaja/swapbook">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-copy">
+      <div class="eyebrow"><b>//</b> storybook for htmx &amp; hypermedia</div>
+      <h1>Point it at your app.<br><span class="out">See</span> <span class="in">every swap.</span></h1>
+      <p class="lede">A component workbench for server-rendered UI. <b>One binary</b> reverse-proxies your running app and renders your components in isolation, with an <b>htmx-aware inspector</b>, live controls and mocked interactions. <b>Zero JS toolchain.</b></p>
+      <div class="install">
+        <div class="cmd">
+          <span class="dol">$</span>
+          <code id="cmd1">go install github.com/Aejkatappaja/swapbook/cmd/swapbook@latest</code>
+          <button class="copy" data-copy="cmd1">copy</button>
+        </div>
+        <div class="cmd sub">
+          <span class="dol">$</span>
+          <code>swapbook --target :8080</code>
+        </div>
+      </div>
+      <div class="cta">
+        <a class="btn-cta primary" href="#quickstart">Quickstart</a>
+        <a class="btn-cta ghost" href="https://github.com/Aejkatappaja/swapbook">Read the source ↗</a>
+      </div>
+    </div>
+
+    <!-- live micro-workbench, the thesis: full width, below the copy -->
+    <div class="demo">
+    <div class="demo-cap"><span class="mn">⇄</span> live demo · runs entirely in your browser</div>
+    <div class="wb" id="wb">
+      <div class="wb-top">
+        <span class="dot" style="background:#e0687d"></span>
+        <span class="dot" style="background:#d9b878"></span>
+        <span class="dot" style="background:#9ece9a"></span>
+        <span class="title"><b>~/<span class="sl">swap</span>book</b> · localhost:7007</span>
+        <div class="wb-modes" role="group" aria-label="interaction mode">
+          <button class="chip" data-mode="mock" aria-pressed="true">mock</button>
+          <button class="chip" data-mode="safe" aria-pressed="false">safe</button>
+          <button class="chip" data-mode="live" aria-pressed="false">live</button>
+        </div>
+      </div>
+      <div class="wb-body">
+        <nav class="wb-nav" id="wbNav" aria-label="stories"></nav>
+        <div class="wb-stage">
+          <div class="wb-canvas" id="wbCanvas"></div>
+          <div class="wb-ctrls" id="wbCtrls"></div>
+        </div>
+        <div class="wb-insp">
+          <div class="itabs">
+            <button class="itab active" data-tab="net"><span class="mn">⇄</span> network</button>
+            <button class="itab" data-tab="a11y">a11y <span class="ibadge">0</span></button>
+            <button class="itab" data-tab="docs">docs</button>
+            <button class="iclear" id="wbClearLog">clear</button>
+          </div>
+          <ul class="wb-log ipanel" id="wbLog" data-panel="net"></ul>
+          <div class="ipanel a11y" data-panel="a11y" hidden>✓ no violations found</div>
+          <div class="ipanel docs" data-panel="docs" hidden><b>Todo list</b> · interactive<br>Click <code>+ add row</code>: the mock returns a new <code>&lt;li&gt;</code> that htmx appends to <code>#rows</code>.</div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section>
+    <div class="sec-head"><div class="k">what you get</div><h2>The parts a hand-rolled preview page can't give you</h2></div>
+    <div class="feats">
+      <div class="feat"><div class="fi">⇄</div><h3>htmx-aware inspector</h3><p>Every request, its params, status and timing, the swap target flashed in the preview, and the returned HTML.</p></div>
+      <div class="feat"><div class="fi">◐</div><h3>mock · safe · live</h3><p>Drive interactions with canned responses (no auth, no DB), block mutations, or run everything for real.</p></div>
+      <div class="feat"><div class="fi">▤</div><h3>Live controls &amp; docs</h3><p>Edit a component's props from the toolbar and re-render. Autodocs and a11y lint come built in.</p></div>
+      <div class="feat"><div class="fi">◇</div><h3>Any stack</h3><p>Go, Django, Rails, Laravel, or any server that answers four HTTP endpoints. No Node build step.</p></div>
+    </div>
+  </section>
+
+  <!-- QUICKSTART -->
+  <section id="quickstart">
+    <div class="sec-head"><div class="k">quickstart</div><h2>Register components in the stack you already use</h2></div>
+    <div class="tabs" id="qsTabs" role="tablist"></div>
+    <pre id="qsCode" role="tabpanel"><code></code></pre>
+  </section>
+
+  <!-- PROTOCOL -->
+  <section id="protocol">
+    <div class="sec-head"><div class="k">how it works</div><h2>A transparent proxy and four endpoints</h2></div>
+    <div class="proto">
+      <table>
+        <thead><tr><th>endpoint (under <code>/_swapbook</code>)</th><th>purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET /manifest.json</code> <span class="req">required</span></td><td>stories, variants, control schemas, asset hints</td></tr>
+          <tr><td><code>GET /preview/{id}/{variant}</code> <span class="req">required</span></td><td>render a component (accepts control args)</td></tr>
+          <tr><td><code>GET /mocks/{id}/{variant}</code></td><td>list a variant's mocked routes</td></tr>
+          <tr><td><code>ANY /mock/{id}/{variant}/{i}</code></td><td>render a mock response</td></tr>
+        </tbody>
+      </table>
+      <div class="flow" aria-label="Swapbook sits between the browser and your app as a reverse proxy">
+        <div class="node browser"><div class="n-t">browser</div><div class="n-s">htmx fires from a preview</div></div>
+        <div class="link"><span class="dot"></span></div>
+        <div class="node sb"><div class="n-t">swapbook :7007</div><div class="n-s">serves the gallery at /__sb/, reverse-proxies everything else</div></div>
+        <div class="link"><span class="dot d2"></span></div>
+        <div class="node app"><div class="n-t">your app :8080</div><div class="n-s">same origin, so no CORS and no URL rewriting</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARE -->
+  <section id="compare">
+    <div class="sec-head"><div class="k">compared to</div><h2>Why not just Storybook?</h2></div>
+    <div style="overflow-x:auto">
+    <table class="cmp">
+      <thead><tr><th>&nbsp;</th><th>Swapbook</th><th>Storybook (server)</th><th>Lookbook</th><th>phoenix_storybook</th></tr></thead>
+      <tbody>
+        <tr><td>Live controls / knobs</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>Framework-agnostic</td><td class="yes">✓</td><td class="part">partial</td><td class="no">Rails</td><td class="no">LiveView</td></tr>
+        <tr><td>No JS toolchain</td><td class="yes">✓</td><td class="no">✕</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+        <tr><td>Single binary</td><td class="yes">✓</td><td class="no">✕</td><td class="no">✕</td><td class="no">✕</td></tr>
+        <tr><td>htmx-aware inspector</td><td class="yes">✓</td><td class="no">✕</td><td class="no">✕</td><td class="no">✕</td></tr>
+        <tr><td>Mocked interactions</td><td class="yes">✓</td><td class="part">via MSW</td><td class="no">✕</td><td class="no">✕</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p style="font-family:var(--sans);color:var(--comment);font-size:12.5px;margin:14px 0 0;max-width:70ch">Lookbook and phoenix_storybook are mature and deeply integrated with their framework, and both have excellent control editors. Swapbook trades that single-framework depth for working across any stack, with the htmx request lifecycle as a first-class citizen.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>Swapbook · MIT © 2026 Aejkatappaja</span>
+    <a href="https://github.com/Aejkatappaja/swapbook">GitHub</a>
+    <a href="#protocol">Protocol</a>
+    <span class="sp">built for hypermedia</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- copy buttons ----
+  document.querySelectorAll(".copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var t = document.getElementById(b.dataset.copy).textContent;
+      navigator.clipboard && navigator.clipboard.writeText(t);
+      var o = b.textContent; b.textContent = "copied"; setTimeout(function () { b.textContent = o; }, 1200);
+    });
+  });
+
+  // ---- workbench data (canned) ----
+  var btn = function (v, label) { return '<button class="btn btn-' + v + '">' + label + '</button>'; };
+  var badge = function (s) { return '<span class="badge badge-' + s + '">' + s + '</span>'; };
+  var initials = function (name) { return name.split(" ").map(function (w) { return w[0]; }).join("").slice(0, 2); };
+  var card = function (name, when, title, status, reviews) {
+    return '<div class="card"><div class="top"><span class="avatar">' + initials(name) + '</span>' +
+      '<div class="who"><strong>' + name + '</strong><span>opened ' + when + '</span></div>' + badge(status) + '</div>' +
+      '<p class="title2">' + title + '</p>' +
+      '<div class="foot"><button class="btn btn-secondary" style="font-size:11px;padding:5px 11px">Review</button>' +
+      (reviews ? '<span class="rev">' + reviews + ' review' + (reviews === 1 ? '' : 's') + '</span>' : '<span class="rev">no reviews yet</span>') +
+      '</div></div>';
+  };
+  var SPK = "0,30 13,25 26,27 40,17 53,20 66,11 80,14 93,7 106,10 118,3";
+  var stat = function () {
+    return '<div class="stat"><div class="lbl">Deploys this week</div><div class="num">1,284</div>' +
+      '<div class="delta">▲ 12% vs last week</div>' +
+      '<svg viewBox="0 0 118 38" preserveAspectRatio="none">' +
+      '<path d="M' + SPK + ' L118,38 0,38 Z" fill="rgba(130,201,224,.13)"/>' +
+      '<polyline points="' + SPK + '" fill="none" stroke="#82c9e0" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>' +
+      '<circle cx="118" cy="3" r="3" fill="#82c9e0"/></svg></div>';
+  };
+  var skeleton = function () {
+    return '<div class="sk"><div class="row"><span class="bar circle"></span>' +
+      '<div class="col"><span class="bar" style="width:60%"></span><span class="bar" style="width:38%"></span></div></div>' +
+      '<span class="bar" style="width:100%"></span><span class="bar" style="width:82%"></span></div>';
+  };
+  var STORIES = [
+    { group: "actions", id: "button", name: "Button", variants: [
+      { n: "primary", html: function () { return btn("primary", "Save changes"); } },
+      { n: "secondary", html: function () { return btn("secondary", "Cancel"); } },
+      { n: "danger", html: function () { return btn("danger", "Delete"); } },
+      { n: "controls", controls: true },
+    ] },
+    { group: "data-display", id: "badge", name: "Badge", variants: [
+      { n: "statuses", html: function () { return '<div class="badges">' + badge("open") + badge("merged") + badge("closed") + '</div>'; } },
+    ] },
+    { group: "data-display", id: "pr-card", name: "PR Card", variants: [
+      { n: "open", html: function () { return card("Ada Lovelace", "2h ago", "Add dark mode to the settings panel", "open", 0); } },
+      { n: "with-reviews", html: function () { return card("Alan Turing", "yesterday", "Refactor the router", "merged", 3); } },
+    ] },
+    { group: "data-display", id: "stat", name: "Stat", variants: [
+      { n: "default", html: stat },
+    ] },
+    { group: "feedback", id: "skeleton", name: "Skeleton", variants: [
+      { n: "loading", html: skeleton },
+      { n: "loaded", html: function () { return card("Ada Lovelace", "2h ago", "First programmer, probably.", "open", 0); } },
+    ] },
+    { group: "interactive", id: "todo", name: "Todo list", variants: [
+      { n: "default", todo: true },
+    ] },
+  ];
+
+  var mode = "mock";
+  var cur = { s: STORIES[0], v: STORIES[0].variants[0] };
+  var nav = document.getElementById("wbNav");
+  var canvas = document.getElementById("wbCanvas");
+  var ctrls = document.getElementById("wbCtrls");
+  var log = document.getElementById("wbLog");
+  var logged = false;
+
+  // build nav (one group header per group, even if several stories share it)
+  var lastG = null;
+  STORIES.forEach(function (s) {
+    if (s.group !== lastG) {
+      var g = document.createElement("div"); g.className = "wb-group"; g.textContent = s.group; nav.appendChild(g); lastG = s.group;
+    }
+    s.variants.forEach(function (v) {
+      var b = document.createElement("button");
+      b.className = "wb-var"; b.textContent = s.name.toLowerCase() + " · " + v.n;
+      b.addEventListener("click", function () { select(s, v); });
+      v._el = b; nav.appendChild(b);
+    });
+  });
+
+  function logRow(o) {
+    if (!logged) { log.innerHTML = ""; logged = true; }
+    var li = document.createElement("li");
+    li.className = "lg" + (o.blocked ? " blk" : "") + (o.mock ? " mck" : "");
+    var a = '<div class="lg-a">';
+    if (o.ev) a += '<span class="ev">' + o.ev + '</span>';
+    if (o.verb) a += '<span class="verb">' + o.verb + '</span>';
+    if (o.path) a += '<span class="path">' + o.path + '</span>';
+    if (o.note) a += '<span class="note">' + o.note + '</span>';
+    if (o.blocked) a += '<span class="st bad">blocked</span>';
+    else if (o.status) a += '<span class="st ok">' + o.status + '</span>';
+    a += '</div>';
+    var parts = [];
+    if (o.target) parts.push('<span class="tgt">→ ' + o.target + '</span>');
+    if (o.ms) parts.push('<span class="ms">' + o.ms + 'ms</span>');
+    if (o.bytes) parts.push('<span class="by">' + o.bytes + 'B</span>');
+    var b = "";
+    if (parts.length || o.curl || o.response) {
+      b = '<div class="lg-b">' + parts.join(" ");
+      if (o.curl) b += ' <button class="chipx cx-curl">⧉ curl</button>';
+      if (o.response) b += ' <button class="chipx cx-vr">view response ▾</button>';
+      b += '</div>';
+      if (o.response) b += '<pre class="vrb" hidden>' + o.response + '</pre>';
+    }
+    li.innerHTML = a + b;
+    if (o.curl) li.querySelector(".cx-curl").addEventListener("click", function () {
+      navigator.clipboard && navigator.clipboard.writeText(o.curl);
+    });
+    if (o.response) {
+      var vb = li.querySelector(".cx-vr"), pre = li.querySelector(".vrb");
+      vb.addEventListener("click", function () { pre.hidden = !pre.hidden; vb.textContent = pre.hidden ? "view response ▾" : "hide response ▴"; });
+    }
+    log.appendChild(li);
+    log.scrollTop = log.scrollHeight;
+  }
+  function ready() { logRow({ ev: "ready", note: "hypermedia: htmx" }); }
+
+  var ROW_HTML = "&lt;li&gt;New task&lt;/li&gt;"; // 17 bytes, matches the real mock
+
+  // add-row: the whole htmx lifecycle, mirroring the real inspector.
+  function addRowFlow() {
+    var live = mode === "live";
+    var url = live ? "/ds/row" : "/__sb/mock/todo-list/default/0";
+    var curl = "curl -H 'HX-Request: true' http://localhost:8080/ds/row";
+    if (!live) logRow({ ev: "mock", verb: "GET", path: "/ds/row", note: "served from mock", mock: true });
+    logRow({ ev: "beforeRequest", verb: "GET", path: url, target: "ul#rows", curl: curl });
+    logRow({ ev: "beforeSwap", verb: "GET", path: url, status: 200, target: "ul#rows", bytes: 17, response: ROW_HTML });
+    logRow({ ev: "afterSwap", verb: "GET", path: url, status: 200, target: "ul#rows" });
+    logRow({ ev: "afterRequest", verb: "GET", path: url, status: 200, target: "ul#rows", ms: 6 + Math.floor(Math.random() * 9) });
+    var li = document.createElement("li"); li.textContent = "New task"; if (!reduce) li.className = "flash";
+    document.getElementById("wbRows").appendChild(li);
+  }
+
+  // clear all: a DELETE mutation. blocked outside live mode.
+  function clearFlow() {
+    if (mode !== "live") { logRow({ ev: "blocked", verb: "DELETE", path: "/ds/rows", blocked: true, note: "mutation blocked in " + mode }); return; }
+    logRow({ ev: "beforeRequest", verb: "DELETE", path: "/ds/rows", target: "ul#rows", curl: "curl -X DELETE -H 'HX-Request: true' http://localhost:8080/ds/rows" });
+    logRow({ ev: "afterRequest", verb: "DELETE", path: "/ds/rows", status: 200, target: "ul#rows", ms: 6 + Math.floor(Math.random() * 9) });
+    document.getElementById("wbRows").innerHTML = "";
+  }
+
+  function select(s, v) {
+    cur = { s: s, v: v };
+    STORIES.forEach(function (x) { x.variants.forEach(function (y) { y._el.setAttribute("aria-current", y === v ? "true" : "false"); }); });
+    render();
+  }
+
+  function render() {
+    var v = cur.v;
+    ctrls.className = "wb-ctrls"; ctrls.innerHTML = "";
+    if (v.todo) {
+      canvas.innerHTML =
+        '<div class="todo"><ul id="wbRows"><li>Write the launch post</li><li>Record the demo gif</li></ul>' +
+        '<div class="row"><button class="btn btn-secondary" id="wbAdd">+ add row</button>' +
+        '<button class="btn btn-danger" id="wbClear">clear all</button></div></div>';
+      document.getElementById("wbAdd").addEventListener("click", addRowFlow);
+      document.getElementById("wbClear").addEventListener("click", clearFlow);
+    } else if (v.controls) {
+      canvas.innerHTML = btn("primary", "Save");
+      renderControls();
+    } else {
+      canvas.innerHTML = v.html();
+    }
+  }
+
+  function renderControls() {
+    ctrls.className = "wb-ctrls on";
+    ctrls.innerHTML =
+      '<label>label <input id="cLabel" value="Save"></label>' +
+      '<label>variant <select id="cVar"><option>primary</option><option>secondary</option><option>danger</option></select></label>';
+    function up() { canvas.innerHTML = btn(document.getElementById("cVar").value, document.getElementById("cLabel").value || "Button"); }
+    document.getElementById("cLabel").addEventListener("input", up);
+    document.getElementById("cVar").addEventListener("change", up);
+  }
+
+  // mode chips
+  document.querySelectorAll(".chip").forEach(function (c) {
+    c.addEventListener("click", function () {
+      mode = c.dataset.mode;
+      document.querySelectorAll(".chip").forEach(function (x) { x.setAttribute("aria-pressed", x === c ? "true" : "false"); });
+    });
+  });
+
+  // inspector tabs (network / a11y / docs) + clear
+  document.querySelectorAll(".itab").forEach(function (t) {
+    t.addEventListener("click", function () {
+      document.querySelectorAll(".itab").forEach(function (x) { x.classList.toggle("active", x === t); });
+      document.querySelectorAll(".ipanel").forEach(function (el) { el.hidden = el.dataset.panel !== t.dataset.tab; });
+    });
+  });
+  document.getElementById("wbClearLog").addEventListener("click", function () { log.innerHTML = ""; logged = false; ready(); });
+
+  var todoS = STORIES[STORIES.length - 1]; // open on Todo: the swap is the thesis
+  select(todoS, todoS.variants[0]);
+  ready(); // seed the inspector like the real frame:ready row
+  // land populated, not empty: play one add-row so the lifecycle is visible
+  setTimeout(function () { if (mode === "mock" && cur.v.todo) addRowFlow(); }, reduce ? 0 : 550);
+
+  // ---- quickstart tabs ----
+  var QS = {
+    Go: '<span class="tok-c">// any Renderer works: templ, html/template, gomponents</span>\n<span class="tok-k">import</span> adapter <span class="tok-s">"github.com/Aejkatappaja/swapbook/adapters/go"</span>\n\nreg := adapter.<span class="tok-f">New</span>()\nreg.<span class="tok-f">RegisterIn</span>(<span class="tok-s">"actions"</span>, <span class="tok-s">"Button"</span>,\n    adapter.<span class="tok-f">Var</span>(<span class="tok-s">"primary"</span>, <span class="tok-f">Button</span>(<span class="tok-s">"Save"</span>, <span class="tok-s">"primary"</span>)),\n    adapter.<span class="tok-f">Var</span>(<span class="tok-s">"empty"</span>, <span class="tok-f">Todo</span>()).\n        <span class="tok-f">Mock</span>(<span class="tok-s">"GET /ds/row"</span>, <span class="tok-f">Row</span>()),\n)\nmux.<span class="tok-f">Handle</span>(adapter.MountPath+<span class="tok-s">"/"</span>, http.<span class="tok-f">StripPrefix</span>(adapter.MountPath, reg.<span class="tok-f">Handler</span>()))',
+    Django: '<span class="tok-k">from</span> swapbook_adapter <span class="tok-k">import</span> Registry, variant, mock\n\nreg = <span class="tok-f">Registry</span>(css_src=<span class="tok-s">"/static/app.css"</span>)\nreg.<span class="tok-f">register</span>(<span class="tok-s">"Button"</span>, group=<span class="tok-s">"actions"</span>, variants=[\n    <span class="tok-f">variant</span>(<span class="tok-s">"primary"</span>, <span class="tok-k">lambda</span> a: render_button(<span class="tok-s">"Save"</span>)),\n    <span class="tok-f">variant</span>(<span class="tok-s">"empty"</span>, todo,\n        mocks=[<span class="tok-f">mock</span>(<span class="tok-s">"GET /ds/row"</span>, <span class="tok-k">lambda</span> a: <span class="tok-s">"&lt;li&gt;New&lt;/li&gt;"</span>)]),\n])\n\nurlpatterns = reg.urls  <span class="tok-c"># mounts /_swapbook/*</span>',
+    Rails: '<span class="tok-k">require</span> <span class="tok-s">"swapbook"</span>\n\nREG = Swapbook::Registry.<span class="tok-f">new</span>(css_src: <span class="tok-s">"/assets/app.css"</span>)\nREG.<span class="tok-f">register</span>(<span class="tok-s">"Button"</span>, group: <span class="tok-s">"actions"</span>, variants: [\n  Swapbook.<span class="tok-f">variant</span>(<span class="tok-s">"primary"</span>, -&gt;(a) { render_button(<span class="tok-s">"Save"</span>) }),\n])\n\n<span class="tok-c"># config/routes.rb</span>\nmount REG =&gt; <span class="tok-s">"/_swapbook"</span>',
+    Laravel: '<span class="tok-k">require</span> <span class="tok-s">"swapbook.php"</span>;\n\n$sb = <span class="tok-k">new</span> <span class="tok-f">Swapbook</span>();\n$sb-&gt;<span class="tok-f">register</span>(<span class="tok-s">"Button"</span>, [\n    <span class="tok-f">sb_variant</span>(<span class="tok-s">"primary"</span>, <span class="tok-k">fn</span>($a) =&gt; view(<span class="tok-s">"button"</span>)-&gt;render()),\n], <span class="tok-s">"actions"</span>);\n\n<span class="tok-c">// route /_swapbook/* -&gt; $sb-&gt;handle($method, $path, $query)</span>',
+    Any: '<span class="tok-c"># no adapter required. answer four endpoints in any language:</span>\n<span class="tok-f">GET</span>  /_swapbook/manifest.json\n<span class="tok-f">GET</span>  /_swapbook/preview/{id}/{variant}\n<span class="tok-f">GET</span>  /_swapbook/mocks/{id}/{variant}\n<span class="tok-f">ANY</span>  /_swapbook/mock/{id}/{variant}/{i}\n\n<span class="tok-c"># examples/ ships stdlib targets in Python, Node and Ruby.</span>',
+  };
+  var tabsEl = document.getElementById("qsTabs");
+  var codeEl = document.getElementById("qsCode").firstElementChild;
+  Object.keys(QS).forEach(function (k, i) {
+    var t = document.createElement("button");
+    t.className = "tab"; t.textContent = k; t.setAttribute("role", "tab");
+    t.setAttribute("aria-selected", i === 0 ? "true" : "false");
+    t.addEventListener("click", function () {
+      tabsEl.querySelectorAll(".tab").forEach(function (x) { x.setAttribute("aria-selected", "false"); });
+      t.setAttribute("aria-selected", "true");
+      codeEl.innerHTML = QS[k];
+    });
+    tabsEl.appendChild(t);
+  });
+  codeEl.innerHTML = QS.Go;
+})();
+</script>
+
+</body>
+</html>
