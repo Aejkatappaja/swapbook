@@ -1,0 +1,22 @@
+# All five Swapbook demo targets at once:
+#   docker compose -f examples/docker-compose.yml up --build
+# then point the binary at any of them, e.g.:  swapbook --target :8000   (django)
+services:
+  go:
+    build: { context: .., dockerfile: examples/go/Dockerfile }
+    ports: ["8002:8000"]
+  python:
+    build: { context: .., dockerfile: examples/python/Dockerfile }
+    ports: ["9101:8000"]
+  node:
+    build: { context: .., dockerfile: examples/node/Dockerfile }
+    ports: ["9102:8000"]
+  ruby:
+    build: { context: .., dockerfile: examples/ruby/Dockerfile }
+    ports: ["9103:8000"]
+  django:
+    build: { context: .., dockerfile: examples/django/Dockerfile }
+    ports: ["8000:8000"]
+  rails:
+    build: { context: .., dockerfile: examples/rails/Dockerfile }
+    ports: ["8001:8000"]
