@@ -255,18 +255,42 @@ The [protocol spec](SPEC.md) documents the four endpoints an app implements.
 
 Shipped: protocol · mock/safe/live modes · htmx inspector (with Turbo, Unpoly and
 Datastar probes) · controls · response viewer · a11y lint · search · deep-links ·
-keyboard nav · copy-as-curl · swap-target highlight · canvas background toggle ·
-per-component autodocs · auto-reload on rebuild.
+keyboard nav · copy-as-curl · swap-target and out-of-band highlight · canvas
+background toggle · per-component autodocs · auto-reload · install via curl /
+npx / go install.
 
-Next: custom viewports, visual regression (screenshot + diff), play/interaction
-functions, distribution (Homebrew / `install.sh` / npx). Tracked in
-[issues](https://github.com/Aejkatappaja/swapbook/issues).
+Planned: error-status mocks, custom viewports, visual regression, play/interaction
+functions, Homebrew. Tracked in the
+[roadmap](https://github.com/Aejkatappaja/swapbook/labels/roadmap).
 
 ## Status
 
 Early. The protocol is proven across seven stacks with tests: Go/templ, Django,
 Rails and Laravel via adapters, plus dependency-free Python, Node and Ruby
 targets. Interfaces may still shift before a tagged release.
+
+## Limitations
+
+Swapbook is early and deliberately scoped. Known edges:
+
+- **htmx is the verified path.** The Turbo, Unpoly and Datastar inspector probes
+  are best-effort and not yet exercised against real apps.
+- **Auto-triggering components.** A preview with `hx-trigger="load"` or polling
+  (`every 2s`) fires real GET requests to your app in mock and safe mode; only
+  mutations are blocked. Mock those routes, or run against a dev database.
+- **SSE and WebSocket** connections are proxied through, but the inspector does
+  not visualize their events (there is no discrete request to trace).
+- **Mocks return 200.** A declared route returns a fixed response, so multi-step
+  stateful flows are out of scope, and simulating error statuses (422, 500) to
+  exercise error swaps is planned but not yet supported.
+- **CSS.** Bare-fragment previews load your app's declared `cssSrc`. If your
+  styles are code-split or purged per route, point `cssSrc` at the full
+  stylesheet so previews match the app. Full-page components bring their own.
+- **Relative asset paths** inside a bare fragment may not resolve; prefer
+  app-absolute paths like `/static/...`.
+
+Swapbook strips security headers and proxies your app, so it is a local
+development tool only. Never run it in production or expose it publicly.
 
 ## License
 

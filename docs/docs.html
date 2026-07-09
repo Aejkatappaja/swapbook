@@ -124,6 +124,7 @@
     <a href="#cli">CLI</a>
     <a href="#adapters">Adapters</a>
     <a href="#protocol">Protocol</a>
+    <a href="#limitations">Limitations</a>
   </aside>
 
   <main>
@@ -260,6 +261,17 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
       </tbody>
     </table>
     <p>Only the first two are required. The full schema is in the <a href="https://github.com/Aejkatappaja/swapbook/blob/main/SPEC.md">protocol specification</a>.</p>
+
+    <h2 id="limitations">Limitations <span class="k">// honest edges</span></h2>
+    <p>Swapbook is early and deliberately scoped. Worth knowing:</p>
+    <ul>
+      <li><b>htmx is the verified path.</b> The Turbo, Unpoly and Datastar probes are best-effort and not yet exercised against real apps.</li>
+      <li><b>Auto-triggering components.</b> A preview with <code>hx-trigger="load"</code> or polling (<code>every 2s</code>) fires real GET requests in mock and safe mode; only mutations are blocked. Mock those routes, or use a dev database.</li>
+      <li><b>SSE and WebSocket</b> connections are proxied through, but the inspector does not visualize their events.</li>
+      <li><b>Mocks return 200.</b> Responses are fixed, so stateful multi-step flows are out of scope, and error-status mocks (422, 500) are planned but not yet supported.</li>
+      <li><b>CSS.</b> Bare-fragment previews load your app's <code>cssSrc</code>. If your styles are code-split or purged per route, point <code>cssSrc</code> at the full stylesheet.</li>
+    </ul>
+    <div class="note">Swapbook strips security headers and proxies your app, so it is a local dev tool only. <b>Never run it in production or expose it publicly.</b></div>
   </main>
 </div>
 

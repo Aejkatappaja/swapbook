@@ -189,6 +189,14 @@
           send(n, out);
         });
       });
+      // out-of-band swaps update elements other than the primary target; flash
+      // and log those too, else a multi-target response looks like nothing
+      // happened outside the main swap.
+      document.addEventListener("htmx:oobAfterSwap", function (/** @type {any} */ e) {
+        var t = (e.detail && e.detail.target) || e.target;
+        flash(t);
+        send("oobSwap", { target: eltDesc(t), lib: "htmx" });
+      });
     },
   };
 

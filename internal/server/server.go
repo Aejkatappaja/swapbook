@@ -45,31 +45,21 @@ func New(raw string, ui UI) (*Server, error) {
 		return nil, err
 	}
 	proxy := httputil.NewSingleHostReverseProxy(t)
-	// A workbench must be able to frame the target's pages. Strip framing
-	// guards from proxied responses so previews (and any in-frame navigation)
-	// are never blocked by the app's own X-Frame-Options / CSP frame-ancestors.
+	// Stream responses through instead of buffering, so Server-Sent Events
+	// (text/event-stream) reach the preview live rather than hanging.
+	proxy.FlushInterval = -1
+	// This is a local dev workbench that frames the target's pages and injects
+	// its inspector into them. Strip the app's framing guards and Content
+	// Security Policy from proxied responses: X-Frame-Options / CSP
+	// frame-ancestors would block framing, and a strict script-src would block
+	// the injected inspector. Only ever runs against a local target you own.
 	proxy.ModifyResponse = func(resp *http.Response) error {
 		resp.Header.Del("X-Frame-Options")
-		if csp := resp.Header.Get("Content-Security-Policy"); csp != "" {
-			resp.Header.Set("Content-Security-Policy", stripFrameAncestors(csp))
-		}
+		resp.Header.Del("Content-Security-Policy")
+		resp.Header.Del("Content-Security-Policy-Report-Only")
 		return nil
 	}
 	return &Server{target: t, proxy: proxy, ui: ui}, nil
-}
-
-// stripFrameAncestors removes the frame-ancestors directive from a CSP header
-// so the app's pages can be framed by the Swapbook preview.
-func stripFrameAncestors(csp string) string {
-	parts := strings.Split(csp, ";")
-	kept := parts[:0]
-	for _, d := range parts {
-		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(d)), "frame-ancestors") {
-			continue
-		}
-		kept = append(kept, d)
-	}
-	return strings.Join(kept, ";")
 }
 
 func normalize(raw string) (*url.URL, error) {
