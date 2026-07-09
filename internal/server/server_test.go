@@ -145,12 +145,8 @@ func TestStripsFramingHeaders(t *testing.T) {
 	if xfo := resp.Header.Get("X-Frame-Options"); xfo != "" {
 		t.Errorf("X-Frame-Options not stripped: %q", xfo)
 	}
-	csp := resp.Header.Get("Content-Security-Policy")
-	if strings.Contains(csp, "frame-ancestors") {
-		t.Errorf("frame-ancestors not stripped: %q", csp)
-	}
-	if !strings.Contains(csp, "default-src") {
-		t.Errorf("other CSP directives lost: %q", csp)
+	if csp := resp.Header.Get("Content-Security-Policy"); csp != "" {
+		t.Errorf("Content-Security-Policy not stripped: %q", csp)
 	}
 }
 
