@@ -26,3 +26,25 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm:
+    name: publish npx launcher
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - name: publish to npm (skipped when NPM_TOKEN is not set)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN not set; skipping npm publish."; exit 0
+          fi
+          version="${GITHUB_REF_NAME#v}"
+          cd packaging/npm
+          npm version "$version" --no-git-tag-version --allow-same-version
+          npm publish --access public

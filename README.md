@@ -41,6 +41,9 @@ swapbook --target :8080
 # prebuilt binary (macOS / Linux)
 curl -fsSL https://raw.githubusercontent.com/Aejkatappaja/swapbook/main/install.sh | sh
 
+# or run without installing (Node)
+npx swapbook --target :8080
+
 # or with Go
 go install github.com/Aejkatappaja/swapbook/cmd/swapbook@latest
 ```

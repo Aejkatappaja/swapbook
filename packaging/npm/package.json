@@ -1,0 +1,37 @@
+{
+  "name": "swapbook",
+  "version": "0.1.0",
+  "description": "Storybook for htmx and hypermedia. One binary, zero JS toolchain.",
+  "bin": {
+    "swapbook": "bin/swapbook.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "keywords": [
+    "htmx",
+    "hypermedia",
+    "storybook",
+    "component-workbench",
+    "design-system"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aejkatappaja/swapbook.git"
+  },
+  "homepage": "https://aejkatappaja.github.io/swapbook/",
+  "license": "MIT",
+  "author": "Aejkatappaja",
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
