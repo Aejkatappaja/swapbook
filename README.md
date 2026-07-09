@@ -274,15 +274,22 @@ Swapbook is early and deliberately scoped. Known edges:
 
 - **htmx is the verified path.** The Turbo, Unpoly and Datastar inspector probes
   are best-effort and not yet exercised against real apps.
+- **Auto-triggering components.** A preview with `hx-trigger="load"` or polling
+  (`every 2s`) fires real GET requests to your app in mock and safe mode; only
+  mutations are blocked. Mock those routes, or run against a dev database.
 - **SSE and WebSocket** connections are proxied through, but the inspector does
   not visualize their events (there is no discrete request to trace).
-- **Mocks are stateless.** A declared route returns a fixed response, so
-  multi-step flows whose output depends on earlier steps are out of scope.
-- **CSP is stripped from proxied responses** so previews can be framed and
-  instrumented. Swapbook is a local dev tool pointed at an app you own; it is not
-  a public proxy.
+- **Mocks return 200.** A declared route returns a fixed response, so multi-step
+  stateful flows are out of scope, and simulating error statuses (422, 500) to
+  exercise error swaps is planned but not yet supported.
+- **CSS.** Bare-fragment previews load your app's declared `cssSrc`. If your
+  styles are code-split or purged per route, point `cssSrc` at the full
+  stylesheet so previews match the app. Full-page components bring their own.
 - **Relative asset paths** inside a bare fragment may not resolve; prefer
   app-absolute paths like `/static/...`.
+
+Swapbook strips security headers and proxies your app, so it is a local
+development tool only. Never run it in production or expose it publicly.
 
 ## License
 
