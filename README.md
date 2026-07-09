@@ -35,6 +35,19 @@ swapbook --target :8080
 <!-- TODO(launch): replace with a real demo.gif (inspector + controls + mock in action) -->
 <p align="center"><i>Demo gif coming soon. In the meantime, <a href="#try-the-demos">run the demos locally</a>.</i></p>
 
+## Install
+
+```
+# prebuilt binary (macOS / Linux)
+curl -fsSL https://raw.githubusercontent.com/Aejkatappaja/swapbook/main/install.sh | sh
+
+# or with Go
+go install github.com/Aejkatappaja/swapbook/cmd/swapbook@latest
+```
+
+Prebuilt binaries for macOS, Linux and Windows (amd64 / arm64) are attached to
+every [release](https://github.com/Aejkatappaja/swapbook/releases).
+
 ## Why
 
 Storybook is built around JS components; its HTML/Server modes are awkward and
