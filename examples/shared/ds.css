@@ -1,0 +1,48 @@
+/* Shared demo design system for Swapbook examples. Light, self-contained
+   components (own surfaces) so they read on any preview canvas. Canonical copy;
+   the Django/Rails demos copy this same file. */
+* { box-sizing: border-box; }
+body { margin: 16px; font-family: system-ui, sans-serif; color: #1f2328; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; cursor: pointer;
+  border: 1px solid transparent; border-radius: 6px; padding: 6px 14px; font-weight: 500;
+}
+.btn-md { font-size: 14px; } .btn-sm { font-size: 12px; padding: 4px 10px; } .btn-lg { font-size: 16px; padding: 9px 18px; }
+.btn-primary { background: #1f883d; color: #fff; }
+.btn-secondary { background: #f6f8fa; color: #24292f; border-color: #d0d7de; }
+.btn-danger { background: #cf222e; color: #fff; }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+.badge { display: inline-block; font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 999px; color: #fff; }
+.badge-open { background: #1a7f37; } .badge-merged { background: #8250df; } .badge-closed { background: #cf222e; }
+
+.alert { border-radius: 6px; padding: 12px 14px; font-size: 14px; border: 1px solid; }
+.alert-info { background: #ddf4ff; border-color: #54aeff; color: #0969da; }
+.alert-success { background: #dafbe1; border-color: #4ac26b; color: #1a7f37; }
+.alert-warning { background: #fff8c5; border-color: #d4a72c; color: #9a6700; }
+.alert-error { background: #ffebe9; border-color: #ff8182; color: #cf222e; }
+
+.card { background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 16px; max-width: 420px; }
+.card-head { display: flex; justify-content: space-between; align-items: center; }
+.card-head strong { font-size: 15px; }
+.card .muted { color: #57606a; font-size: 13px; margin: 10px 0 0; }
+
+.field { display: flex; flex-direction: column; gap: 6px; max-width: 360px; }
+.field label { font-size: 13px; font-weight: 500; }
+.field input { font: inherit; padding: 6px 10px; border: 1px solid #d0d7de; border-radius: 6px; }
+.field.error input { border-color: #cf222e; }
+.field .err { color: #cf222e; font-size: 12px; }
+.field input[disabled] { background: #f6f8fa; color: #8c959f; }
+
+.empty { text-align: center; color: #57606a; padding: 32px 16px; border: 1px dashed #d0d7de; border-radius: 8px; max-width: 420px; }
+.empty .mark { font-size: 28px; }
+.empty h4 { margin: 8px 0 4px; color: #1f2328; }
+
+table.ds { border-collapse: collapse; width: 100%; max-width: 520px; font-size: 14px; }
+table.ds th { text-align: left; color: #57606a; font-weight: 500; padding: 8px 12px; border-bottom: 1px solid #d0d7de; }
+table.ds td { padding: 8px 12px; border-bottom: 1px solid #eaeef2; }
+
+.todo { max-width: 420px; }
+.todo ul { list-style: none; margin: 0 0 10px; padding: 0; }
+.todo li { padding: 8px 12px; border: 1px solid #d0d7de; border-radius: 6px; margin-bottom: 6px; background: #fff; }
