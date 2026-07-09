@@ -1,0 +1,36 @@
+name: e2e-docker
+
+# Building the Rails and Laravel demo images takes minutes, so this runs on main
+# and nightly (and on demand) rather than on every pull request.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "adapters/**"
+      - "examples/**"
+      - "internal/**"
+      - "cmd/**"
+      - ".github/workflows/e2e-docker.yml"
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    name: framework demos (django/rails/laravel)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - name: build images + drive the protocol through the binary
+        run: bash examples/smoke-docker.sh
