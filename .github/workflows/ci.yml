@@ -93,4 +93,5 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.2"
+      - run: gem install webrick --no-document # dropped from Ruby's default gems in 3.0
       - run: bash examples/smoke.sh
