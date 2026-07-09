@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="assets/logo.svg" width="88" height="88" alt="Swapbook">
+  <img src="assets/logo-wordmark.svg" width="300" alt="Swapbook">
 </p>
-
-<h1 align="center">Swapbook</h1>
 
 <p align="center">
   <b>Storybook for htmx &amp; hypermedia.</b> One binary, zero JS toolchain.

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 76" width="300" height="76" role="img" aria-label="Swapbook">
+  <rect width="300" height="76" rx="14" fill="#14161c"/>
+  <g transform="translate(22,19) scale(1.19)">
+    <path d="M8 12 H21" stroke="#82c9e0" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M17.5 8.5 L22 12 L17.5 15.5" fill="none" stroke="#82c9e0" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M24 20 H11" stroke="#d9b878" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M14.5 16.5 L10 20 L14.5 23.5" fill="none" stroke="#d9b878" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="80" y="48" font-family="ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace" font-size="27" font-weight="700" letter-spacing="-0.5">
+    <tspan fill="#d9b878">~/</tspan><tspan fill="#82c9e0">swap</tspan><tspan fill="#d9b878">book</tspan>
+  </text>
+</svg>
