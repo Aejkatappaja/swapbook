@@ -255,12 +255,13 @@ The [protocol spec](SPEC.md) documents the four endpoints an app implements.
 
 Shipped: protocol · mock/safe/live modes · htmx inspector (with Turbo, Unpoly and
 Datastar probes) · controls · response viewer · a11y lint · search · deep-links ·
-keyboard nav · copy-as-curl · swap-target highlight · canvas background toggle ·
-per-component autodocs · auto-reload on rebuild.
+keyboard nav · copy-as-curl · swap-target and out-of-band highlight · canvas
+background toggle · per-component autodocs · auto-reload · install via curl /
+npx / go install.
 
-Next: custom viewports, visual regression (screenshot + diff), play/interaction
-functions, distribution (Homebrew / `install.sh` / npx). Tracked in
-[issues](https://github.com/Aejkatappaja/swapbook/issues).
+Planned: error-status mocks, custom viewports, visual regression, play/interaction
+functions, Homebrew. Tracked in the
+[roadmap](https://github.com/Aejkatappaja/swapbook/labels/roadmap).
 
 ## Status
 
