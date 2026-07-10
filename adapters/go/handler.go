@@ -134,8 +134,9 @@ func (r *Registry) serveMocks(w http.ResponseWriter, req *http.Request) {
 		http.NotFound(w, req)
 		return
 	}
-	out := make([]MockMeta, len(v.Mocks))
-	for i, m := range v.Mocks {
+	mocks := r.mocksFor(v)
+	out := make([]MockMeta, len(mocks))
+	for i, m := range mocks {
 		out[i] = MockMeta{Verb: m.Verb, Path: m.Path, Index: i}
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -146,12 +147,17 @@ func (r *Registry) serveMocks(w http.ResponseWriter, req *http.Request) {
 func (r *Registry) serveMock(w http.ResponseWriter, req *http.Request) {
 	v := r.findVariant(req.PathValue("id"), req.PathValue("variant"))
 	idx, err := strconv.Atoi(req.PathValue("index"))
-	if v == nil || err != nil || idx < 0 || idx >= len(v.Mocks) {
+	if v == nil {
+		http.NotFound(w, req)
+		return
+	}
+	mocks := r.mocksFor(v)
+	if err != nil || idx < 0 || idx >= len(mocks) {
 		http.NotFound(w, req)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := v.Mocks[idx].Component.Render(req.Context(), w); err != nil {
+	if err := mocks[idx].Component.Render(req.Context(), w); err != nil {
 		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
 	}
 }

@@ -212,6 +212,8 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
         <span class="fn">Mock</span>(<span class="st">"GET /ds/row"</span>, <span class="fn">TodoRow</span>()).
         <span class="fn">Doc</span>(<span class="st">"Click + add row: the mock returns a new &lt;li&gt; htmx appends."</span>),
 )</code></pre>
+    <p>Routes shared across stories (an autocomplete endpoint, a token fetch) can be declared once on the registry instead of on every variant, like Storybook's meta-level handlers. They merge into every variant; a variant's own mock for the same route wins.</p>
+    <pre><code>reg.<span class="fn">Mock</span>(<span class="st">"GET /app/exercises/search"</span>, <span class="fn">ExerciseSuggestions</span>())</code></pre>
 
     <h2 id="modes">Modes <span class="k">// mock · safe · live</span></h2>
     <p>The toolbar has three modes, deciding what happens to htmx requests fired from inside a story:</p>
@@ -265,7 +267,7 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
     <h2 id="limitations">Limitations <span class="k">// honest edges</span></h2>
     <p>Swapbook is early and deliberately scoped. Worth knowing:</p>
     <ul>
-      <li><b>htmx is the verified path.</b> The Turbo, Unpoly and Datastar probes are best-effort and not yet exercised against real apps.</li>
+      <li><b>htmx is the verified path, any version.</b> Previews load your app's own htmx via <code>htmxSrc</code>, so they run whatever version you ship (1.x or 2.x); the embedded fallback is htmx 2.0.4. The Turbo, Unpoly and Datastar probes are best-effort and not yet exercised against real apps.</li>
       <li><b>Auto-triggering components.</b> A preview with <code>hx-trigger="load"</code> or polling (<code>every 2s</code>) fires real GET requests in mock and safe mode; only mutations are blocked. Mock those routes, or use a dev database.</li>
       <li><b>SSE and WebSocket</b> connections are proxied through, but the inspector does not visualize their events.</li>
       <li><b>Mocks return 200.</b> Responses are fixed, so stateful multi-step flows are out of scope, and error-status mocks (422, 500) are planned but not yet supported.</li>

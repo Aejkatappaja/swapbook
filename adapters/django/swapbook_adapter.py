@@ -63,11 +63,21 @@ class Registry:
     def __init__(self, htmx_src="", css_src="", js_src=""):
         self.htmx_src, self.css_src, self.js_src = htmx_src, css_src, js_src
         self._stories = []
+        self._global_mocks = []
 
     def register(self, name, variants, group="", docs=""):
         self._stories.append(
             {"id": slug(name), "name": name, "group": group, "docs": docs, "variants": variants}
         )
+
+    def mock(self, route, render):
+        """Declare a registry-level mock merged into every variant, for routes
+        shared across stories. A variant's own mock for the same route wins."""
+        self._global_mocks.append(mock(route, render))
+        return self
+
+    def _mocks_for(self, v):
+        return self._global_mocks + v["mocks"]
 
     def _find(self, sid, vname):
         for s in self._stories:
@@ -105,13 +115,17 @@ class Registry:
         v = self._find(sid, vname)
         if not v:
             return HttpResponseNotFound()
+        mks = self._mocks_for(v)
         return JsonResponse(
-            [{"verb": m["verb"], "path": m["path"], "index": i} for i, m in enumerate(v["mocks"])],
+            [{"verb": m["verb"], "path": m["path"], "index": i} for i, m in enumerate(mks)],
             safe=False,
         )
 
     def _mock(self, request, sid, vname, index):
         v = self._find(sid, vname)
-        if not v or index < 0 or index >= len(v["mocks"]):
+        if not v:
             return HttpResponseNotFound()
-        return HttpResponse(v["mocks"][index]["render"]({}))
+        mks = self._mocks_for(v)
+        if index < 0 or index >= len(mks):
+            return HttpResponseNotFound()
+        return HttpResponse(mks[index]["render"]({}))

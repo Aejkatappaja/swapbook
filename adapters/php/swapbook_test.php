@@ -71,5 +71,21 @@ check($st === 404, 'unknown preview 404');
 [$st] = $sb->handle('GET', '/nope', []);
 check($st === 404, 'non-swapbook path 404');
 
+// registry-level mocks merged into every variant
+$sb2 = new Swapbook();
+$sb2->mock('GET /shared', fn($a) => '<div>SHARED</div>');
+$sb2->register('Card', [
+    sb_variant('a', fn($a) => '<div>a</div>', [], '', [sb_mock('POST /save', fn($a) => 'SAVED')]),
+    sb_variant('b', fn($a) => '<div>b</div>'),
+], 'x');
+[, , $body] = $sb2->handle('GET', '/_swapbook/mocks/card/a', []);
+$la = json_decode($body, true);
+check(count($la) === 2 && $la[0]['path'] === '/shared' && $la[1]['path'] === '/save', 'registry mock first, then variant own');
+[, , $body] = $sb2->handle('GET', '/_swapbook/mocks/card/b', []);
+$lb = json_decode($body, true);
+check(count($lb) === 1 && $lb[0]['path'] === '/shared', 'variant without own mocks inherits the global');
+[$st, , $body] = $sb2->handle('GET', '/_swapbook/mock/card/b/0', []);
+check($st === 200 && $body === '<div>SHARED</div>', 'render inherited global mock');
+
 echo $fails === 0 ? "\nPHP ADAPTER: ALL PASS\n" : "\nPHP ADAPTER: $fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

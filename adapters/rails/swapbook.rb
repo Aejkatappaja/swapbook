@@ -29,10 +29,18 @@ module Swapbook
     def initialize(htmx_src: "", css_src: "", js_src: "")
       @htmx_src, @css_src, @js_src = htmx_src, css_src, js_src
       @stories = []
+      @global_mocks = []
     end
 
     def register(name, variants:, group: "", docs: "")
       @stories << { id: Swapbook.slug(name), name: name, group: group, docs: docs, variants: variants }
+    end
+
+    # Declare a registry-level mock merged into every variant, for routes shared
+    # across stories. A variant's own mock for the same route wins. Chainable.
+    def mock(route, render)
+      @global_mocks << Swapbook.mock(route, render)
+      self
     end
 
     # Rack entry point (PATH_INFO is relative to the mount point).
@@ -47,10 +55,11 @@ module Swapbook
         v ? html(v[:render].call(coerce(v[:controls], params))) : not_found
       when %r{\A/mocks/([^/]+)/([^/]+)\z}
         v = find($1, $2)
-        v ? json(v[:mocks].each_with_index.map { |m, i| { verb: m[:verb], path: m[:path], index: i } }) : not_found
+        v ? json(mocks_for(v).each_with_index.map { |m, i| { verb: m[:verb], path: m[:path], index: i } }) : not_found
       when %r{\A/mock/([^/]+)/([^/]+)/(\d+)\z}
         v = find($1, $2)
-        (v && v[:mocks][$3.to_i]) ? html(v[:mocks][$3.to_i][:render].call({})) : not_found
+        mk = v && mocks_for(v)[$3.to_i]
+        mk ? html(mk[:render].call({})) : not_found
       else
         not_found
       end
@@ -73,6 +82,11 @@ module Swapbook
     def find(sid, vname)
       s = @stories.find { |st| st[:id] == sid }
       s && s[:variants].find { |v| v[:name] == vname }
+    end
+
+    # registry-level mocks first, then the variant's own (which override on dup)
+    def mocks_for(v)
+      @global_mocks + v[:mocks]
     end
 
     def coerce(controls, params)

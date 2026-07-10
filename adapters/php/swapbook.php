@@ -29,6 +29,7 @@ function sb_variant(string $name, callable $render, array $controls = [], string
 class Swapbook
 {
     private array $stories = [];
+    private array $globalMocks = [];
     public string $htmxSrc = '';
     public string $cssSrc = '';
     public string $jsSrc = '';
@@ -36,6 +37,19 @@ class Swapbook
     public function register(string $name, array $variants, string $group = '', string $docs = ''): void
     {
         $this->stories[] = ['id' => self::slug($name), 'name' => $name, 'group' => $group, 'docs' => $docs, 'variants' => $variants];
+    }
+
+    /** Declare a registry-level mock merged into every variant, for routes
+     * shared across stories. A variant's own mock for the same route wins. */
+    public function mock(string $route, callable $render): static
+    {
+        $this->globalMocks[] = sb_mock($route, $render);
+        return $this;
+    }
+
+    private function mocksFor(array $v): array
+    {
+        return array_merge($this->globalMocks, $v['mocks']);
     }
 
     public static function slug(string $s): string
@@ -92,15 +106,19 @@ class Swapbook
                 return $this->notFound();
             }
             $out = [];
-            foreach ($v['mocks'] as $i => $mk) {
+            foreach ($this->mocksFor($v) as $i => $mk) {
                 $out[] = ['verb' => $mk['verb'], 'path' => $mk['path'], 'index' => $i];
             }
             return $this->json($out);
         }
         if (preg_match('#^/_swapbook/mock/([^/]+)/([^/]+)/(\d+)$#', $path, $m)) {
             $v = $this->find($m[1], $m[2]);
-            return ($v && isset($v['mocks'][(int) $m[3]]))
-                ? $this->html(($v['mocks'][(int) $m[3]]['render'])([]))
+            if (!$v) {
+                return $this->notFound();
+            }
+            $mks = $this->mocksFor($v);
+            return isset($mks[(int) $m[3]])
+                ? $this->html(($mks[(int) $m[3]]['render'])([]))
                 : $this->notFound();
         }
         return $this->notFound();
