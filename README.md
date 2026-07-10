@@ -69,6 +69,10 @@ a hand-rolled `/preview` page can't give you.
 - **Live controls.** Edit a component's props from the toolbar and re-render.
 - **a11y lint, search, deep-links, keyboard-driven.**
 
+The gallery UI is plain JavaScript, type-checked with JSDoc and `checkJs` in CI,
+not TypeScript: the whole tool is zero-build, so a compile step would defeat the
+point. The binary itself is Go with no dependencies.
+
 ## Quickstart
 
 ### Go / templ
