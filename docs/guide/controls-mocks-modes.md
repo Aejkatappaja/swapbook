@@ -54,6 +54,21 @@ variant("default", todo,
     mocks=[mock("GET /ds/row", lambda a: "<li>New task</li>")])
 ```
 
+### Registry-level mocks
+
+Routes shared across many stories (an autocomplete endpoint, a token fetch) can
+be declared once on the registry instead of repeated on every variant, like
+Storybook's meta-level handlers. They are merged into every variant; a variant's
+own mock for the same route takes precedence.
+
+```go
+reg.Mock("GET /app/exercises/search", ExerciseSuggestions())
+reg.Mock("POST /app/workouts", Saved())
+```
+
+The same method exists on every adapter: `reg.mock(...)` in Django and Rails,
+`$sb->mock(...)` in PHP.
+
 ## Interaction modes
 
 The toolbar has three modes, passed into every preview. They decide what happens
