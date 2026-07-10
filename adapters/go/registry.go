@@ -171,10 +171,33 @@ type Registry struct {
 	// "/static/app.js"). Swapbook injects it (deferred) into bare-fragment
 	// previews so client-side behavior (typeaheads, delegated handlers) works.
 	JSSrc string
+
+	// globalMocks are declared once on the registry and merged into every
+	// variant, so routes shared across stories need not be repeated per variant.
+	globalMocks []Mock
 }
 
 // New creates an empty Registry.
 func New() *Registry { return &Registry{} }
+
+// Mock declares a registry-level mock merged into every variant, for routes
+// shared across stories (like Storybook's meta-level handlers). A variant's own
+// Mock for the same route takes precedence. Chainable.
+func (r *Registry) Mock(route string, c Renderer) *Registry {
+	verb, path := splitRoute(route)
+	r.globalMocks = append(r.globalMocks, Mock{Verb: verb, Path: path, Component: c})
+	return r
+}
+
+// mocksFor returns a variant's effective mocks: registry-level mocks first, then
+// the variant's own. A variant mock for a duplicate route overrides the global
+// one, since Swapbook keeps the later "VERB path" entry when building its map.
+func (r *Registry) mocksFor(v *Variant) []Mock {
+	out := make([]Mock, 0, len(r.globalMocks)+len(v.Mocks))
+	out = append(out, r.globalMocks...)
+	out = append(out, v.Mocks...)
+	return out
+}
 
 // Register adds a story built from a name and its variants. The story ID is
 // the slugified name; Group is optional and set via RegisterIn.

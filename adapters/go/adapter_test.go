@@ -53,6 +53,40 @@ func TestManifestAndPreview(t *testing.T) {
 	}
 }
 
+func TestGlobalMocks(t *testing.T) {
+	reg := New()
+	reg.Mock("GET /shared", HTML("GLOBAL"))
+	reg.Register("Card",
+		Var("a", HTML("<div>a</div>")).Mock("POST /save", HTML("SAVED")),
+		Var("b", HTML("<div>b</div>")),
+	)
+	srv := httptest.NewServer(reg.Handler())
+	defer srv.Close()
+
+	// variant "a": registry mock first, then the variant's own
+	resp, _ := http.Get(srv.URL + "/mocks/card/a")
+	var la []MockMeta
+	json.NewDecoder(resp.Body).Decode(&la)
+	if len(la) != 2 || la[0].Path != "/shared" || la[1].Path != "/save" {
+		t.Fatalf("a mocks = %+v", la)
+	}
+	// variant "b" with no own mocks still inherits the registry mock
+	resp, _ = http.Get(srv.URL + "/mocks/card/b")
+	var lb []MockMeta
+	json.NewDecoder(resp.Body).Decode(&lb)
+	if len(lb) != 1 || lb[0].Path != "/shared" {
+		t.Fatalf("b mocks = %+v", lb)
+	}
+	// render the inherited global mock (index 0) on variant b
+	if resp, _ = http.Get(srv.URL + "/mock/card/b/0"); readBody(t, resp) != "GLOBAL" {
+		t.Errorf("global mock render wrong")
+	}
+	// render variant a's own mock (index 1, after the global)
+	if resp, _ = http.Post(srv.URL+"/mock/card/a/1", "", nil); readBody(t, resp) != "SAVED" {
+		t.Errorf("variant mock render wrong")
+	}
+}
+
 func TestMocks(t *testing.T) {
 	reg := New()
 	reg.Register("Card",
