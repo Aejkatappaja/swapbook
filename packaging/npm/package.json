@@ -1,6 +1,6 @@
 {
   "name": "swapbook",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Storybook for htmx and hypermedia. One binary, zero JS toolchain.",
   "bin": {
     "swapbook": "bin/swapbook.js"
