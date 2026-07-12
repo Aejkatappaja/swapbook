@@ -46,6 +46,14 @@ type Mock struct {
 	Status int
 }
 
+// Viewport is a named preview width offered in the Swapbook UI in addition to
+// the built-in full/tablet/phone (e.g. {"wide", "1440px"}). Width is any CSS
+// length the preview element accepts.
+type Viewport struct {
+	Name  string `json:"name"`
+	Width string `json:"w"`
+}
+
 // Control declares one editable arg for a variant, rendered as a knob in the
 // Swapbook UI. Type is "text", "number", "bool" or "select".
 type Control struct {
@@ -183,6 +191,9 @@ type Registry struct {
 	// "/static/app.js"). Swapbook injects it (deferred) into bare-fragment
 	// previews so client-side behavior (typeaheads, delegated handlers) works.
 	JSSrc string
+	// Viewports are named preview widths the UI offers on top of its built-in
+	// full/tablet/phone. Optional.
+	Viewports []Viewport
 
 	// globalMocks are declared once on the registry and merged into every
 	// variant, so routes shared across stories need not be repeated per variant.

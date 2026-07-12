@@ -53,6 +53,36 @@ func TestManifestAndPreview(t *testing.T) {
 	}
 }
 
+// TestViewportsInManifest proves project-declared viewports reach the manifest,
+// and that omitting them keeps the field absent (omitempty).
+func TestViewportsInManifest(t *testing.T) {
+	reg := New()
+	reg.Viewports = []Viewport{{Name: "wide", Width: "1440px"}}
+	reg.Register("Card", Var("a", HTML("<div>a</div>")))
+	srv := httptest.NewServer(reg.Handler())
+	defer srv.Close()
+
+	resp, _ := http.Get(srv.URL + "/manifest.json")
+	var m manifest
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Viewports) != 1 || m.Viewports[0].Name != "wide" || m.Viewports[0].Width != "1440px" {
+		t.Fatalf("viewports = %+v", m.Viewports)
+	}
+
+	// no viewports declared -> omitted from the JSON entirely
+	reg2 := New()
+	reg2.Register("Card", Var("a", HTML("<div>a</div>")))
+	srv2 := httptest.NewServer(reg2.Handler())
+	defer srv2.Close()
+	resp, _ = http.Get(srv2.URL + "/manifest.json")
+	body := readBody(t, resp)
+	if strings.Contains(body, "viewports") {
+		t.Errorf("empty viewports should be omitted: %s", body)
+	}
+}
+
 func TestGlobalMocks(t *testing.T) {
 	reg := New()
 	reg.Mock("GET /shared", HTML("GLOBAL"))
