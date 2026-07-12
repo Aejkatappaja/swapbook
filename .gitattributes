@@ -1,0 +1,15 @@
+# GitHub Linguist: make the language bar reflect the actual application source.
+# These overrides only affect language stats and some diff rendering; they change
+# nothing about the build or what ships.
+
+# htmx is bundled as an embedded fallback (third party), not our code.
+cmd/swapbook/ui/htmx.min.js linguist-vendored
+
+# The landing page and docs site are documentation, not application source.
+docs/**       linguist-documentation
+
+# Examples exist to demonstrate the protocol in each language.
+examples/**   linguist-documentation
+
+# Test suites are not part of the shipped language surface.
+test/**       linguist-vendored
