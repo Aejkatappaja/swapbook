@@ -150,12 +150,14 @@ swapbook --version</code></pre>
 
 reg := adapter.<span class="fn">New</span>()
 reg.CSSSrc = <span class="st">"/static/app.css"</span> <span class="c">// injected into bare-fragment previews</span>
+reg.Viewports = []adapter.Viewport{{Name: <span class="st">"wide"</span>, Width: <span class="st">"1440px"</span>}} <span class="c">// optional named widths</span>
 
 reg.<span class="fn">RegisterIn</span>(<span class="st">"actions"</span>, <span class="st">"Button"</span>,
     adapter.<span class="fn">Var</span>(<span class="st">"primary"</span>,   <span class="fn">Button</span>(<span class="st">"Save"</span>, <span class="st">"primary"</span>)),
     adapter.<span class="fn">Var</span>(<span class="st">"secondary"</span>, <span class="fn">Button</span>(<span class="st">"Cancel"</span>, <span class="st">"secondary"</span>)),
 )
 reg.<span class="fn">DocStory</span>(<span class="st">"Button"</span>, <span class="st">"The button primitive."</span>)</code></pre>
+    <p class="muted">Viewports set via <code>reg.Viewports</code> appear in the toolbar's width bar next to the built-in full/tablet/phone, and the width you pick is remembered per story. Other stacks emit the same <code>viewports</code> list in their manifest.</p>
 
     <h3>Django</h3>
     <pre><code><span class="kw">from</span> swapbook_adapter <span class="kw">import</span> Registry, variant
@@ -214,6 +216,10 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
 )</code></pre>
     <p>Routes shared across stories (an autocomplete endpoint, a token fetch) can be declared once on the registry instead of on every variant, like Storybook's meta-level handlers. They merge into every variant; a variant's own mock for the same route wins.</p>
     <pre><code>reg.<span class="fn">Mock</span>(<span class="st">"GET /app/exercises/search"</span>, <span class="fn">ExerciseSuggestions</span>())</code></pre>
+    <p>A mock serves <code>200</code> by default. Give it a non-2xx status to preview a component reacting to a failure (<code>hx-target-error</code>, status-conditional swaps); Swapbook proxies the status through unchanged.</p>
+    <pre><code>adapter.<span class="fn">Var</span>(<span class="st">"invalid"</span>, <span class="fn">SignupForm</span>()).
+    <span class="fn">MockStatus</span>(<span class="st">"POST /signup"</span>, 422, <span class="fn">ValidationErrors</span>())</code></pre>
+    <p class="muted">Other stacks take an optional status argument, e.g. <code>mock(route, render, status=422)</code> in Django.</p>
 
     <h2 id="modes">Modes <span class="k">// mock · safe · live</span></h2>
     <p>The toolbar has three modes, deciding what happens to htmx requests fired from inside a story:</p>
@@ -267,10 +273,10 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
     <h2 id="limitations">Limitations <span class="k">// honest edges</span></h2>
     <p>Swapbook is early and deliberately scoped. Worth knowing:</p>
     <ul>
-      <li><b>htmx is the verified path, any version.</b> Previews load your app's own htmx via <code>htmxSrc</code>, so they run whatever version you ship (1.x or 2.x); the embedded fallback is htmx 2.0.4. The Turbo, Unpoly and Datastar probes are best-effort and not yet exercised against real apps.</li>
+      <li><b>htmx is the verified path, any version.</b> Previews load your app's own htmx via <code>htmxSrc</code>, so they run whatever version you ship (1.x or 2.x); the embedded fallback is htmx 2.0.4. The Turbo, Unpoly and Datastar probes are best-effort; they are exercised against the real libraries in a browser end-to-end test, but htmx remains the most complete path.</li>
       <li><b>Auto-triggering components.</b> A preview with <code>hx-trigger="load"</code> or polling (<code>every 2s</code>) fires real GET requests in mock and safe mode; only mutations are blocked. Mock those routes, or use a dev database.</li>
       <li><b>SSE and WebSocket</b> connections are proxied through, but the inspector does not visualize their events.</li>
-      <li><b>Mocks return 200.</b> Responses are fixed, so stateful multi-step flows are out of scope, and error-status mocks (422, 500) are planned but not yet supported.</li>
+      <li><b>Mocks are stateless.</b> A mock returns a fixed response (it may set a non-2xx status like 422/500 to exercise error swaps), so stateful multi-step flows are out of scope.</li>
       <li><b>CSS.</b> Bare-fragment previews load your app's <code>cssSrc</code>. If your styles are code-split or purged per route, point <code>cssSrc</code> at the full stylesheet.</li>
     </ul>
     <div class="note">Swapbook strips security headers and proxies your app, so it is a local dev tool only. <b>Never run it in production or expose it publicly.</b></div>

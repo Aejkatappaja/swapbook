@@ -69,6 +69,23 @@ reg.Mock("POST /app/workouts", Saved())
 The same method exists on every adapter: `reg.mock(...)` in Django and Rails,
 `$sb->mock(...)` in PHP.
 
+### Error-status mocks
+
+A mock serves `200` by default. Give it a non-2xx status to preview a component
+reacting to a failure (`hx-target-error`, status-conditional swaps). Swapbook
+proxies the status through unchanged, so the client library sees the real code.
+
+**Go** uses `MockStatus("VERB /path", status, renderer)`:
+
+```go
+adapter.Var("invalid", SignupForm()).
+    MockStatus("POST /signup", 422, ValidationErrors())
+```
+
+The other stacks take an optional status argument: `mock(route, render, status=422)`
+in Django, `mock(route, render, status: 422)` in Rails, and
+`sb_mock($route, $render, status: 422)` in PHP.
+
 ## Interaction modes
 
 The toolbar has three modes, passed into every preview. They decide what happens
