@@ -157,6 +157,9 @@ func (r *Registry) serveMock(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if st := mocks[idx].Status; st != 0 {
+		w.WriteHeader(st)
+	}
 	if err := mocks[idx].Component.Render(req.Context(), w); err != nil {
 		http.Error(w, "render: "+err.Error(), http.StatusInternalServerError)
 	}

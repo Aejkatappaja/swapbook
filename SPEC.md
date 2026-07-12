@@ -91,6 +91,10 @@ Lists the routes this variant mocks. Return `[]` or `404` if none.
 Returns the mock HTML fragment (`Content-Type: text/html`) for the given
 `index`. Must accept any HTTP method (a mocked `POST` is rendered the same way).
 
+A mock may return a non-2xx status (e.g. `422`, `500`) to preview a component
+reacting to a failure (`hx-target-error`, status-conditional swaps). Swapbook
+proxies the status through unchanged, so the client library sees the real code.
+
 ## How Swapbook uses these
 
 The binary reverse-proxies every non-`/__sb/` request straight to the target,

@@ -65,6 +65,16 @@ check($st === 200 && ($mk[0]['verb'] ?? '') === 'GET' && ($mk[0]['path'] ?? '') 
 [$st, , $body] = $sb->handle('POST', '/_swapbook/mock/todo/default/0', []);
 check($st === 200 && $body === '<li>New task</li>', 'mock render');
 
+// mock with an explicit status serves it for error-state previews
+$sb3 = new Swapbook();
+$sb3->register('Form', [
+    sb_variant('invalid', fn($a) => '<div>form</div>', [], '', [
+        sb_mock('POST /save', fn($a) => '<div>invalid</div>', 422),
+    ]),
+]);
+[$st, , $body] = $sb3->handle('POST', '/_swapbook/mock/form/invalid/0', []);
+check($st === 422 && $body === '<div>invalid</div>', 'mock render honors status');
+
 // unknown routes -> 404
 [$st] = $sb->handle('GET', '/_swapbook/preview/nope/nope', []);
 check($st === 404, 'unknown preview 404');

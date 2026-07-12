@@ -119,6 +119,33 @@ func TestMocks(t *testing.T) {
 	}
 }
 
+// TestMockStatus proves a mock can serve a non-200 status for error-state
+// previews, while a plain Mock still defaults to 200.
+func TestMockStatus(t *testing.T) {
+	reg := New()
+	reg.Register("Card",
+		Var("empty", HTML("<div>card</div>")).
+			Mock("GET /app/rows", HTML("<div>ROW</div>")).
+			MockStatus("POST /app/save", 422, HTML("<div>invalid</div>")),
+	)
+	srv := httptest.NewServer(reg.Handler())
+	defer srv.Close()
+
+	// mock with an explicit status serves it, with the body intact
+	resp, _ := http.Post(srv.URL+"/mock/card/empty/1", "", nil)
+	if resp.StatusCode != 422 {
+		t.Errorf("mock status = %d, want 422", resp.StatusCode)
+	}
+	if got := readBody(t, resp); got != "<div>invalid</div>" {
+		t.Errorf("mock body = %q", got)
+	}
+	// a plain Mock still defaults to 200
+	resp, _ = http.Get(srv.URL + "/mock/card/empty/0")
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("default mock status = %d, want 200", resp.StatusCode)
+	}
+}
+
 // TestRendererDecoupled proves the adapter takes any Renderer, not just templ:
 // a custom RenderFunc renders through the same pipeline.
 func TestRendererDecoupled(t *testing.T) {

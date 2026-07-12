@@ -41,6 +41,9 @@ type Mock struct {
 	Verb      string
 	Path      string
 	Component Renderer
+	// Status is the HTTP status served for this mock. Zero means 200; set a
+	// non-2xx code (422, 500, …) to preview a component's error state.
+	Status int
 }
 
 // Control declares one editable arg for a variant, rendered as a knob in the
@@ -120,6 +123,15 @@ func (v Variant) Mock(route string, c Renderer) Variant {
 	return v
 }
 
+// MockStatus is Mock with an explicit HTTP status, so a variant can preview a
+// component reacting to a failure (422, 500, …) instead of the default 200.
+// Chainable.
+func (v Variant) MockStatus(route string, status int, c Renderer) Variant {
+	verb, path := splitRoute(route)
+	v.Mocks = append(v.Mocks, Mock{Verb: verb, Path: path, Component: c, Status: status})
+	return v
+}
+
 // Doc attaches documentation (light markdown) shown in Swapbook's docs tab.
 // Chainable.
 func (v Variant) Doc(md string) Variant {
@@ -186,6 +198,14 @@ func New() *Registry { return &Registry{} }
 func (r *Registry) Mock(route string, c Renderer) *Registry {
 	verb, path := splitRoute(route)
 	r.globalMocks = append(r.globalMocks, Mock{Verb: verb, Path: path, Component: c})
+	return r
+}
+
+// MockStatus is Mock with an explicit HTTP status (422, 500, …) for a
+// registry-level mock. Chainable.
+func (r *Registry) MockStatus(route string, status int, c Renderer) *Registry {
+	verb, path := splitRoute(route)
+	r.globalMocks = append(r.globalMocks, Mock{Verb: verb, Path: path, Component: c, Status: status})
 	return r
 }
 

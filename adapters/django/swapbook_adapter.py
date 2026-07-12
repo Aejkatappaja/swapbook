@@ -27,10 +27,12 @@ def control(name, type="text", default=None, options=None):
     return c
 
 
-def mock(route, render):
-    """A canned response: route is "VERB /path", render is (args)->str."""
+def mock(route, render, status=200):
+    """A canned response: route is "VERB /path", render is (args)->str.
+
+    Pass a non-2xx status (422, 500, …) to preview a component's error state."""
     verb, _, p = route.partition(" ") if " " in route else ("GET", "", route)
-    return {"verb": verb.upper(), "path": p or route, "render": render}
+    return {"verb": verb.upper(), "path": p or route, "render": render, "status": status}
 
 
 def variant(name, render, controls=None, docs="", mocks=None):
@@ -70,10 +72,10 @@ class Registry:
             {"id": slug(name), "name": name, "group": group, "docs": docs, "variants": variants}
         )
 
-    def mock(self, route, render):
+    def mock(self, route, render, status=200):
         """Declare a registry-level mock merged into every variant, for routes
         shared across stories. A variant's own mock for the same route wins."""
-        self._global_mocks.append(mock(route, render))
+        self._global_mocks.append(mock(route, render, status))
         return self
 
     def _mocks_for(self, v):
@@ -128,4 +130,5 @@ class Registry:
         mks = self._mocks_for(v)
         if index < 0 or index >= len(mks):
             return HttpResponseNotFound()
-        return HttpResponse(mks[index]["render"]({}))
+        mk = mks[index]
+        return HttpResponse(mk["render"]({}), status=mk.get("status", 200))

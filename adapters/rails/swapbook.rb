@@ -16,9 +16,10 @@ module Swapbook
     { name: name, type: type, default: default, options: options }.compact
   end
 
-  def self.mock(route, render)
+  # Pass a non-2xx status (422, 500, …) to preview a component's error state.
+  def self.mock(route, render, status: 200)
     verb, path = route.include?(" ") ? route.split(" ", 2) : ["GET", route]
-    { verb: verb.upcase, path: path, render: render }
+    { verb: verb.upcase, path: path, render: render, status: status }
   end
 
   def self.variant(name, render, controls: [], docs: "", mocks: [])
@@ -38,8 +39,8 @@ module Swapbook
 
     # Declare a registry-level mock merged into every variant, for routes shared
     # across stories. A variant's own mock for the same route wins. Chainable.
-    def mock(route, render)
-      @global_mocks << Swapbook.mock(route, render)
+    def mock(route, render, status: 200)
+      @global_mocks << Swapbook.mock(route, render, status: status)
       self
     end
 
@@ -59,7 +60,7 @@ module Swapbook
       when %r{\A/mock/([^/]+)/([^/]+)/(\d+)\z}
         v = find($1, $2)
         mk = v && mocks_for(v)[$3.to_i]
-        mk ? html(mk[:render].call({})) : not_found
+        mk ? html(mk[:render].call({}), mk[:status] || 200) : not_found
       else
         not_found
       end
@@ -107,7 +108,7 @@ module Swapbook
     end
 
     def json(obj) = [200, { "content-type" => "application/json" }, [JSON.generate(obj)]]
-    def html(str) = [200, { "content-type" => "text/html; charset=utf-8" }, [str.to_s]]
+    def html(str, status = 200) = [status, { "content-type" => "text/html; charset=utf-8" }, [str.to_s]]
     def not_found = [404, { "content-type" => "text/plain" }, ["not found"]]
   end
 end

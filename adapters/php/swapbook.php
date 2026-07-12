@@ -15,10 +15,11 @@ function sb_control(string $name, string $type = 'text', $default = null, ?array
     return $c;
 }
 
-function sb_mock(string $route, callable $render): array
+// Pass a non-2xx $status (422, 500, …) to preview a component's error state.
+function sb_mock(string $route, callable $render, int $status = 200): array
 {
     [$verb, $path] = str_contains($route, ' ') ? explode(' ', $route, 2) : ['GET', $route];
-    return ['verb' => strtoupper($verb), 'path' => $path, 'render' => $render];
+    return ['verb' => strtoupper($verb), 'path' => $path, 'render' => $render, 'status' => $status];
 }
 
 function sb_variant(string $name, callable $render, array $controls = [], string $docs = '', array $mocks = []): array
@@ -41,9 +42,9 @@ class Swapbook
 
     /** Declare a registry-level mock merged into every variant, for routes
      * shared across stories. A variant's own mock for the same route wins. */
-    public function mock(string $route, callable $render): static
+    public function mock(string $route, callable $render, int $status = 200): static
     {
-        $this->globalMocks[] = sb_mock($route, $render);
+        $this->globalMocks[] = sb_mock($route, $render, $status);
         return $this;
     }
 
@@ -117,8 +118,9 @@ class Swapbook
                 return $this->notFound();
             }
             $mks = $this->mocksFor($v);
-            return isset($mks[(int) $m[3]])
-                ? $this->html(($mks[(int) $m[3]]['render'])([]))
+            $mk = $mks[(int) $m[3]] ?? null;
+            return $mk
+                ? $this->html(($mk['render'])([]), $mk['status'] ?? 200)
                 : $this->notFound();
         }
         return $this->notFound();
@@ -136,6 +138,6 @@ class Swapbook
     }
 
     private function json(array $o): array { return [200, 'application/json', json_encode($o)]; }
-    private function html(string $s): array { return [200, 'text/html; charset=utf-8', $s]; }
+    private function html(string $s, int $status = 200): array { return [$status, 'text/html; charset=utf-8', $s]; }
     private function notFound(): array { return [404, 'text/plain', 'not found']; }
 }
