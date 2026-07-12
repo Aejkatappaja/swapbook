@@ -12,6 +12,7 @@ isolation with an htmx-aware inspector, live controls and mocked interactions.
 - [Controls, mocks and modes](controls-mocks-modes.md): live knobs, canned responses, and the mock / safe / live gates.
 - [CLI reference](cli.md): flags and usage of the `swapbook` binary.
 - [Adapters](adapters.md): the built-in adapters and how to write your own.
+- [Authoring an adapter](authoring-adapters.md): derive a new adapter for any stack from the protocol.
 
 ## Reference
 

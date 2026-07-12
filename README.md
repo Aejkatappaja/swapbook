@@ -242,8 +242,10 @@ Full guides live in [`docs/guide/`](docs/guide/):
 - [Controls, mocks and modes](docs/guide/controls-mocks-modes.md): live knobs, canned responses, the mock / safe / live gates.
 - [CLI reference](docs/guide/cli.md): flags and usage.
 - [Adapters](docs/guide/adapters.md): built-in adapters and writing your own.
+- [Authoring an adapter](docs/guide/authoring-adapters.md): derive a new adapter for any stack from the protocol.
 
 The [protocol spec](SPEC.md) documents the four endpoints an app implements.
+Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Compared to
 
