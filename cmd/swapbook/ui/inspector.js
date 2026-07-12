@@ -106,17 +106,30 @@
     return {};
   }
 
+  // active[name] is set once a probe attaches (see wire()), so the nav guard
+  // knows which libraries are live and can defer their own links/forms to them.
+  var active = {};
+
   // Contain navigation: a full-page component ships real <a href> / <form>
   // that would navigate the preview iframe across the whole (proxied) app,
   // escaping the story and losing the inspector. Outside live mode, cancel
-  // native navigations and log them. htmx-driven links/forms are left to the
-  // probes (they gate those). Live mode lets you roam the real app.
-  function htmxDriven(el) {
-    return !!(
+  // native navigations and log them. Links/forms driven by an active hypermedia
+  // library are left to that library's probe (it reroutes/blocks/logs them);
+  // the probe gates the request, so containment still holds. Live mode lets you
+  // roam the real app.
+  function libDriven(el) {
+    if (
       el.closest("[hx-boost]") ||
       el.hasAttribute("hx-get") || el.hasAttribute("hx-post") ||
       el.hasAttribute("hx-put") || el.hasAttribute("hx-delete") || el.hasAttribute("hx-patch")
-    );
+    ) return true;
+    // Unpoly: any element opting into unpoly navigation.
+    if (active.unpoly && el.closest("[up-follow],[up-submit],[up-target],[up-layer],[up-nav],[up-href]")) return true;
+    // Turbo Drive owns every same-origin link/form unless explicitly opted out.
+    if (active.turbo && !el.closest('[data-turbo="false"]')) return true;
+    // Datastar wires requests via data-on-* actions, not native nav.
+    if (active.datastar && el.closest("[data-on-click],[data-on-submit],[data-on-load]")) return true;
+    return false;
   }
   document.addEventListener("click", function (/** @type {any} */ e) {
     if (mode === "live" || !e.target.closest) return;
@@ -124,14 +137,14 @@
     if (!a) return;
     var href = a.getAttribute("href");
     if (!href || href[0] === "#" || href.indexOf("javascript:") === 0 || a.target === "_blank") return;
-    if (htmxDriven(a)) return;
+    if (libDriven(a)) return;
     e.preventDefault();
     send("nav", { path: href });
   }, true);
   document.addEventListener("submit", function (/** @type {any} */ e) {
     if (mode === "live") return;
     var f = e.target;
-    if (htmxDriven(f)) return;
+    if (libDriven(f)) return;
     e.preventDefault();
     send("nav", { verb: up(f.method || "GET"), path: f.getAttribute("action") || "" });
   }, true);
@@ -343,6 +356,7 @@
     var attached = [];
     PROBES.forEach(function (p) {
       if (p.detect()) {
+        active[p.name] = true;
         p.attach();
         attached.push(p.name);
       }
