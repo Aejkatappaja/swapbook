@@ -31,6 +31,11 @@ func fakeTarget() *httptest.Server {
 	mux.HandleFunc(adapter.MountPath+"/mock/card/empty/0", func(w http.ResponseWriter, _ *http.Request) {
 		io.WriteString(w, `<div>MOCKROW</div>`)
 	})
+	// a mock that fails, to prove the overlay propagates a non-200 status
+	mux.HandleFunc(adapter.MountPath+"/mock/card/empty/1", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(422)
+		io.WriteString(w, `<div>INVALID</div>`)
+	})
 	return httptest.NewServer(mux)
 }
 
@@ -127,6 +132,18 @@ func TestMockWiring(t *testing.T) {
 	// the overlay serves the mock render from the adapter
 	if got := body(t, ts.URL+Overlay+"/mock/card/empty/0"); got != "<div>MOCKROW</div>" {
 		t.Errorf("mock render = %q", got)
+	}
+	// a non-200 mock status is propagated so the client sees the real code
+	resp, err := http.Get(ts.URL + Overlay + "/mock/card/empty/1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 422 {
+		t.Errorf("mock status = %d, want 422", resp.StatusCode)
+	}
+	if b, _ := io.ReadAll(resp.Body); string(b) != "<div>INVALID</div>" {
+		t.Errorf("failed mock body = %q", b)
 	}
 }
 

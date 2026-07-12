@@ -32,7 +32,19 @@ var (
 	tableT = tmpl(`<table class="ds"><thead><tr><th>name</th><th>role</th><th>status</th></tr></thead><tbody>{{range .}}<tr><td>{{.Name}}</td><td>{{.Role}}</td><td><span class="badge badge-{{.Status}}">{{.Status}}</span></td></tr>{{end}}</tbody></table>`)
 	todoT  = tmpl(`<div class="todo"><ul id="rows"><li>Write the launch post</li><li>Record the demo gif</li></ul><button class="btn btn-secondary" hx-get="/ds/row" hx-target="#rows" hx-swap="beforeend">+ add row</button></div>`)
 	rowT   = tmpl(`<li>New task</li>`)
-	phanT  = tmpl(`<script src="https://cdn.jsdelivr.net/npm/@aejkatappaja/phantom-ui/dist/phantom-ui.cdn.js"></script><phantom-ui{{if .Loading}} loading{{end}} animation="{{.Animation}}" style="display:block;max-width:420px"><div class="card"><div class="card-head"><strong>Ada Lovelace</strong></div><p class="muted">First programmer, probably.</p></div></phantom-ui>`)
+	// The response-targets extension lets htmx swap on an error status; the
+	// mock for POST /ds/save returns 422, so hx-target-422 renders the error body.
+	saveFormT = tmpl(`<script src="https://cdn.jsdelivr.net/npm/htmx-ext-response-targets@2.0.3"></script>
+<div hx-ext="response-targets" class="field">
+  <form hx-post="/ds/save" hx-target="#save-out" hx-target-422="#save-out" hx-swap="innerHTML">
+    <label>Email</label>
+    <input name="email" value="not-an-email">
+    <button class="btn btn-primary">Save</button>
+  </form>
+  <div id="save-out"></div>
+</div>`)
+	saveErrT = tmpl(`<div class="alert alert-error">Enter a valid email</div>`)
+	phanT    = tmpl(`<script src="https://cdn.jsdelivr.net/npm/@aejkatappaja/phantom-ui/dist/phantom-ui.cdn.js"></script><phantom-ui{{if .Loading}} loading{{end}} animation="{{.Animation}}" style="display:block;max-width:420px"><div class="card"><div class="card-head"><strong>Ada Lovelace</strong></div><p class="muted">First programmer, probably.</p></div></phantom-ui>`)
 )
 
 type row struct{ Name, Role, Status string }
@@ -139,6 +151,12 @@ func registry() *adapter.Registry {
 		adapter.Var("default", render(todoT, nil)).
 			Mock("GET /ds/row", render(rowT, nil)).
 			Doc("Click **+ add row**: the mock returns a new `<li>` htmx appends. Watch the swap-target flash in the inspector."),
+	)
+
+	reg.RegisterIn("interactive", "Form validation",
+		adapter.Var("invalid", render(saveFormT, nil)).
+			MockStatus("POST /ds/save", 422, render(saveErrT, nil)).
+			Doc("Click **Save**: the mock replies `422`, so `hx-target-422` swaps in the error alert. The inspector logs the request with its failing status."),
 	)
 
 	reg.RegisterIn("web components", "Skeleton (phantom-ui)",
