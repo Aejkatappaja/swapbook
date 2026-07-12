@@ -35,5 +35,7 @@ and how full-page vs fragment previews are detected, is in the
 [protocol specification](../../SPEC.md).
 
 A minimal, dependency-free reference implementation is
-`examples/python/target.py` (about 140 lines of stdlib). Community adapters for
-other stacks are welcome; implement the protocol and open a PR.
+`examples/python/target.py` (about 140 lines of stdlib). For a step-by-step walk
+through the protocol, see [Authoring an adapter](authoring-adapters.md).
+Community adapters for other stacks are welcome; implement the protocol and open
+a PR.
