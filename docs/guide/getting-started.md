@@ -46,6 +46,8 @@ func Workbench() http.Handler {
     reg.HTMXSrc = "/static/htmx.min.js" // your app's htmx build
     reg.CSSSrc = "/static/app.css"       // injected into bare-fragment previews
     reg.JSSrc = "/static/app.js"
+    // optional: named preview widths on top of the built-in full/tablet/phone
+    reg.Viewports = []adapter.Viewport{{Name: "wide", Width: "1440px"}}
 
     reg.RegisterIn("actions", "Button",
         adapter.Var("primary", Button("Save", "primary")),
@@ -60,6 +62,10 @@ mux.Handle(adapter.MountPath+"/", http.StripPrefix(adapter.MountPath, Workbench(
 Reload `http://localhost:7007/__sb/`: the Button story appears. From here, see
 [Writing stories](writing-stories.md) to add variants, controls and mocks, and
 [Controls, mocks and modes](controls-mocks-modes.md) to drive interactions.
+
+Any viewports set via `reg.Viewports` appear in the toolbar's width bar next to
+the built-ins; the width you pick is remembered per story. Other stacks emit the
+same `viewports` list in their manifest.
 
 ## How it works
 

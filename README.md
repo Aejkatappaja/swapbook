@@ -258,13 +258,13 @@ The [protocol spec](SPEC.md) documents the four endpoints an app implements.
 ## Roadmap
 
 Shipped: protocol · mock/safe/live modes · htmx inspector (with Turbo, Unpoly and
-Datastar probes) · controls · response viewer · a11y lint · search · deep-links ·
-keyboard nav · copy-as-curl · swap-target and out-of-band highlight · canvas
-background toggle · per-component autodocs · auto-reload · install via curl /
-npx / go install.
+Datastar probes, verified end to end) · error-status mocks · controls · response
+viewer · a11y lint · search · deep-links · keyboard nav · copy-as-curl ·
+swap-target and out-of-band highlight · canvas background toggle · custom
+viewports · per-component autodocs · auto-reload · install via curl / npx /
+go install.
 
-Planned: error-status mocks, custom viewports, visual regression, play/interaction
-functions, Homebrew. Tracked in the
+Planned: visual regression, play/interaction functions, Homebrew. Tracked in the
 [roadmap](https://github.com/Aejkatappaja/swapbook/labels/roadmap).
 
 ## Status
@@ -280,15 +280,16 @@ Swapbook is early and deliberately scoped. Known edges:
 - **htmx is the verified path, any version.** Previews load your app's own htmx
   via `htmxSrc`, so they run whatever version you ship (1.x or 2.x); the embedded
   fallback used when `htmxSrc` is unset is htmx 2.0.4. The Turbo, Unpoly and
-  Datastar inspector probes are best-effort and not yet exercised against real apps.
+  Datastar inspector probes are best-effort; they are exercised against the real
+  libraries in a browser end-to-end test, but htmx remains the most complete path.
 - **Auto-triggering components.** A preview with `hx-trigger="load"` or polling
   (`every 2s`) fires real GET requests to your app in mock and safe mode; only
   mutations are blocked. Mock those routes, or run against a dev database.
 - **SSE and WebSocket** connections are proxied through, but the inspector does
   not visualize their events (there is no discrete request to trace).
-- **Mocks return 200.** A declared route returns a fixed response, so multi-step
-  stateful flows are out of scope, and simulating error statuses (422, 500) to
-  exercise error swaps is planned but not yet supported.
+- **Mocks are stateless.** A declared route returns a fixed response (a mock may
+  set a non-2xx status like 422/500 to exercise error swaps), so multi-step
+  stateful flows are out of scope.
 - **CSS.** Bare-fragment previews load your app's declared `cssSrc`. If your
   styles are code-split or purged per route, point `cssSrc` at the full
   stylesheet so previews match the app. Full-page components bring their own.
