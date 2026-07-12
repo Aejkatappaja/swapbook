@@ -40,6 +40,9 @@ Returns the gallery contents and asset hints.
 {
   "htmxSrc": "/static/htmx.min.js",  // app-relative htmx URL, or "" to use Swapbook's embedded htmx
   "cssSrc":  "/static/app.css",      // app-relative stylesheet injected into bare-fragment previews, or ""
+  "viewports": [                     // optional named preview widths, added to the built-in full/tablet/phone
+    { "name": "wide", "w": "1440px" }
+  ],
   "stories": [
     {
       "id": "workout-form",          // slug, used in URLs

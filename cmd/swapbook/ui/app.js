@@ -8,7 +8,8 @@
  * @typedef {{ name: string, controls?: Control[], docs?: string }} VariantObj
  * @typedef {string | VariantObj} Variant  variants may be a bare name (hand-rolled targets) or an object
  * @typedef {{ id: string, name: string, group?: string, docs?: string, variants: Variant[] }} Story
- * @typedef {{ htmxSrc?: string, cssSrc?: string, jsSrc?: string, stories?: Story[] }} Manifest
+ * @typedef {{ name: string, w: string }} Viewport  a project-declared preview width
+ * @typedef {{ htmxSrc?: string, cssSrc?: string, jsSrc?: string, stories?: Story[], viewports?: Viewport[] }} Manifest
  * @typedef {{ source: string, seq?: number, event: string, data?: any }} SBMessage  posted by the frame's inspector
  */
 
@@ -17,6 +18,11 @@ const WIDTHS = [
   { label: "tablet", w: "768px" },
   { label: "phone", w: "375px" },
 ];
+// Built-ins plus any viewports the project declares in its manifest. Rebuilt on
+// every manifest load (extends the built-ins, deduped by label; built-ins win).
+let allWidths = WIDTHS.slice();
+/** @param {unknown} label @returns {boolean} is this a known viewport label */
+const hasWidth = (label) => allWidths.some((w) => w.label === label);
 const MODES = ["mock", "safe", "live"];
 const MODE_TITLES = {
   mock: "mocked routes served locally, unmocked writes blocked",
@@ -30,6 +36,15 @@ let htmxSrc = "", cssSrc = "", jsSrc = "";
 let mode = "mock";
 let widthLabel = "full";
 let bg = localStorage.getItem("swapbook:bg") || "dark";
+// Per-story viewport memory: switching to a story restores the width last used
+// for it. An explicit URL "w" still wins, so shared links stay exact.
+const VW_KEY = "swapbook:viewports";
+/** @type {Record<string, string>} storyId -> viewport label */
+let vwMem = {};
+try {
+  const parsed = JSON.parse(localStorage.getItem(VW_KEY) || "{}");
+  if (parsed && typeof parsed === "object") vwMem = parsed;
+} catch {}
 /** @type {Story[]} */ let allStories = [];
 /** @type {{ story: Story, variant: Variant } | null} */ let current = null;
 /** @type {Record<string, any>} */ let args = {};
@@ -55,6 +70,15 @@ function applyManifest(text) {
   cssSrc = m.cssSrc || "";
   jsSrc = m.jsSrc || "";
   allStories = m.stories || [];
+  allWidths = WIDTHS.slice();
+  if (Array.isArray(m.viewports)) {
+    for (const v of m.viewports) {
+      if (v && v.name && v.w && !allWidths.some((x) => x.label === v.name)) {
+        allWidths.push({ label: String(v.name), w: String(v.w) });
+      }
+    }
+  }
+  renderWidths(); // the manifest may add viewports, so rebuild the width bar
 }
 
 // fetchManifest classifies the target: "ok" (adapter answered with a manifest),
@@ -140,7 +164,7 @@ function showAutodocs() {
   el("autodocs").hidden = false;
 }
 
-function selectVariant(story, v, stateArgs) {
+function selectVariant(story, v, stateArgs, width) {
   docsView = false;
   showPreview();
   current = { story, variant: v };
@@ -150,6 +174,10 @@ function selectVariant(story, v, stateArgs) {
   setActiveStory();
   renderControls(vControls(v));
   renderDocs(vDocs(v));
+  // Resolve the viewport once: an explicit width (from the URL) wins, else the
+  // one last used for this story, else full. Applied without persisting, since
+  // only a deliberate pick should write the story's remembered width.
+  setWidth(width || (hasWidth(vwMem[story.id]) ? vwMem[story.id] : "full"), false);
   loadFrame();
   writeState();
 }
@@ -325,12 +353,17 @@ function segmented(containerId, values, onpick, title) {
   }
   return (val) => qsa("button", bar).forEach((b) => b.classList.toggle("active", b.dataset.val === val));
 }
+// renderWidths rebuilds just the viewport bar; split out so a manifest load
+// (which may add project viewports) can refresh it without touching mode/bg.
+function renderWidths() {
+  setWidthActive = segmented("widths", allWidths.map((w) => w.label), setWidth);
+  setWidthActive(widthLabel);
+}
 function renderBars() {
   setModeActive = segmented("modes", MODES, setMode, (v) => MODE_TITLES[v] || "");
-  setWidthActive = segmented("widths", WIDTHS.map((w) => w.label), setWidth);
+  renderWidths();
   setBgActive = segmented("bgs", BGS, setBg);
   setModeActive(mode);
-  setWidthActive(widthLabel);
   setBgActive(bg);
   el("stage").style.background = bgCanvas(bg);
 }
@@ -340,11 +373,19 @@ function setMode(m) {
   loadFrame();
   writeState();
 }
-function setWidth(label) {
-  const p = WIDTHS.find((x) => x.label === label) || WIDTHS[0];
+// setWidth applies a viewport. persist=false is used for per-story recall (the
+// caller writes state itself); a deliberate pick (button/keyboard) persists the
+// story's remembered width and writes state here.
+function setWidth(label, persist = true) {
+  const p = allWidths.find((x) => x.label === label) || allWidths[0];
   widthLabel = p.label;
   el("preview").style.width = p.w;
   setWidthActive(p.label);
+  if (!persist) return;
+  if (current) {
+    vwMem[current.story.id] = p.label;
+    try { localStorage.setItem(VW_KEY, JSON.stringify(vwMem)); } catch {}
+  }
   writeState();
 }
 // bgCanvas maps a bg choice to the canvas (#stage) backdrop. dark is kept
@@ -391,19 +432,20 @@ function applyParams(str) {
   if (!story) return false;
   const v = story.variants.find((x) => vName(x) === p.get("variant")) || story.variants[0];
   if (MODES.includes(p.get("mode"))) mode = p.get("mode");
-  if (WIDTHS.some((w) => w.label === p.get("w"))) widthLabel = p.get("w");
+  const urlW = hasWidth(p.get("w")) ? p.get("w") : null;
   if (BGS.includes(p.get("bg"))) bg = p.get("bg");
   setModeActive(mode);
   setBgActive(bg);
   el("stage").style.background = bgCanvas(bg);
-  setWidth(widthLabel);
   if (p.get("docs") === "1") {
     selectDocs(story);
     return true;
   }
   const stateArgs = {};
   for (const [k, val] of p) if (k.startsWith("arg.")) stateArgs[k.slice(4)] = val;
-  selectVariant(story, v, stateArgs);
+  // Pass the URL width down so the whole precedence rule (URL > remembered >
+  // full) lives in selectVariant; a shared link never mutates local memory.
+  selectVariant(story, v, stateArgs, urlW);
   return true;
 }
 
@@ -627,7 +669,10 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "/") { e.preventDefault(); return el("story-search").focus(); }
   if (e.key === "j") { e.preventDefault(); return moveStory(1); }
   if (e.key === "k") { e.preventDefault(); return moveStory(-1); }
-  if (e.key >= "1" && e.key <= "3") return setWidth(WIDTHS[+e.key - 1].label);
+  if (e.key >= "1" && e.key <= "9") {
+    const i = +e.key - 1;
+    return i < allWidths.length ? setWidth(allWidths[i].label) : undefined;
+  }
   if (e.key === "m") return setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]);
 });
 

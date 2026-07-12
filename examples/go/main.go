@@ -62,6 +62,8 @@ func phantom(loading bool, anim string) adapter.Renderer {
 func registry() *adapter.Registry {
 	reg := adapter.New()
 	reg.CSSSrc = "/static/ds.css"
+	// Named viewports the UI offers on top of the built-in full/tablet/phone.
+	reg.Viewports = []adapter.Viewport{{Name: "wide", Width: "1440px"}, {Name: "mobile-lg", Width: "430px"}}
 
 	reg.RegisterIn("actions", "Button",
 		adapter.Var("primary", btn("Save", "primary", "md", false)),

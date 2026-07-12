@@ -12,10 +12,11 @@ const MountPath = "/_swapbook"
 
 // manifest is the wire format Swapbook reads to build its gallery.
 type manifest struct {
-	HTMXSrc string      `json:"htmxSrc"`
-	CSSSrc  string      `json:"cssSrc"`
-	JSSrc   string      `json:"jsSrc"`
-	Stories []storyMeta `json:"stories"`
+	HTMXSrc   string      `json:"htmxSrc"`
+	CSSSrc    string      `json:"cssSrc"`
+	JSSrc     string      `json:"jsSrc"`
+	Viewports []Viewport  `json:"viewports,omitempty"`
+	Stories   []storyMeta `json:"stories"`
 }
 
 type storyMeta struct {
@@ -69,7 +70,7 @@ func (r *Registry) findVariant(id, variant string) *Variant {
 }
 
 func (r *Registry) serveManifest(w http.ResponseWriter, _ *http.Request) {
-	m := manifest{HTMXSrc: r.HTMXSrc, CSSSrc: r.CSSSrc, JSSrc: r.JSSrc}
+	m := manifest{HTMXSrc: r.HTMXSrc, CSSSrc: r.CSSSrc, JSSrc: r.JSSrc, Viewports: r.Viewports}
 	for _, s := range r.stories {
 		vs := make([]variantMeta, len(s.Variants))
 		for i, v := range s.Variants {
