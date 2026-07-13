@@ -25,6 +25,10 @@ func fakeTarget() *httptest.Server {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'self'")
 		io.WriteString(w, "ROW")
 	})
+	// echoes back auth-relevant request headers, to prove injection reaches the target
+	mux.HandleFunc("/app/whoami", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, r.Header.Get("Cookie")+"|"+r.Header.Get("X-User"))
+	})
 	mux.HandleFunc(adapter.MountPath+"/mocks/card/empty", func(w http.ResponseWriter, _ *http.Request) {
 		io.WriteString(w, `[{"verb":"GET","path":"/app/rows","index":0}]`)
 	})
@@ -79,6 +83,47 @@ func TestOverlayRoutes(t *testing.T) {
 	// reverse proxy passes non-overlay paths straight to the target
 	if got := body(t, ts.URL+"/app/workouts/entry-row"); got != "ROW" {
 		t.Errorf("proxy passthrough = %q", got)
+	}
+}
+
+func TestHeaderInjection(t *testing.T) {
+	target := fakeTarget()
+	defer target.Close()
+	srv, err := New(target.URL, testUI(), "Cookie: session=abc", "X-User: ada", "malformed-no-colon")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	// injected headers reach the target on a proxied (non-overlay) request
+	if got := body(t, ts.URL+"/app/whoami"); got != "session=abc|ada" {
+		t.Errorf("injected headers = %q, want %q", got, "session=abc|ada")
+	}
+
+	// with no headers configured, nothing is added
+	plain, _ := New(target.URL, testUI())
+	pts := httptest.NewServer(plain.Handler())
+	defer pts.Close()
+	if got := body(t, pts.URL+"/app/whoami"); got != "|" {
+		t.Errorf("unexpected headers without injection: %q", got)
+	}
+}
+
+func TestParseHeaders(t *testing.T) {
+	got := parseHeaders([]string{"Cookie: a=b", "X-User:  ada ", "no-colon", "  : empty-name", "Authorization: Bearer x:y"})
+	want := []header{
+		{"Cookie", "a=b"},
+		{"X-User", "ada"},
+		{"Authorization", "Bearer x:y"}, // only the first colon splits; value keeps the rest
+	}
+	if len(got) != len(want) {
+		t.Fatalf("parseHeaders len = %d, want %d (%+v)", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("header[%d] = %+v, want %+v", i, got[i], want[i])
+		}
 	}
 }
 
