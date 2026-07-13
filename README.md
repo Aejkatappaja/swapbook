@@ -32,8 +32,9 @@ swapbook --target :8080
 # open http://localhost:7007/__sb/
 ```
 
-<!-- TODO(launch): replace with a real demo.gif (inspector + controls + mock in action) -->
-<p align="center"><i>Demo gif coming soon. In the meantime, <a href="#try-the-demos">run the demos locally</a>.</i></p>
+<p align="center">
+  <img src="assets/hero.png" width="900" alt="The Swapbook workbench: a story sidebar, a live component preview, and an htmx-aware inspector showing a mocked request's full lifecycle (mock, beforeSwap, afterSwap, 200, timing).">
+</p>
 
 ## Install
 
