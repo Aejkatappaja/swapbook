@@ -4,6 +4,35 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-13
+
+### Added
+
+- **Error-status mocks.** A mock can declare a non-2xx status (422, 500, ...) so
+  a component's failure state (`hx-target-error`, status-conditional swaps) can
+  be previewed. `MockStatus(route, status, renderer)` in Go, and an optional
+  `status` argument on the Django, Rails and Laravel adapters. Swapbook proxies
+  the status through unchanged.
+- **Custom viewports.** A project can declare named preview widths in its
+  manifest (`reg.Viewports` on the Go adapter), added to the built-in
+  full/tablet/phone. The workbench also remembers the viewport last used per
+  story, while an explicit URL width still wins for shared links.
+- **Auth for protected previews.** A repeatable `--header 'Name: value'` flag
+  injects headers (e.g. a session cookie) into every request forwarded to the
+  target, so components behind auth render in safe/live mode.
+
+### Changed
+
+- **Verified hypermedia probes.** The Turbo, Unpoly and Datastar inspector
+  probes are now exercised against the real libraries in a browser end-to-end
+  test. This surfaced and fixed a navigation guard that shadowed the Unpoly
+  probe, so mock rerouting and mutation blocking now work for all three.
+
+### Documentation
+
+- Added `CONTRIBUTING.md` and an authoring-an-adapter guide that derives a new
+  adapter from the protocol, to seed community adapters.
+
 ## [0.2.0] - 2026-07-10
 
 ### Added
@@ -38,5 +67,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   inspector, mock / safe / live modes, live controls, a11y lint, adapters for
   Go/templ, Django, Rails and Laravel, and install via curl / npx / go install.
 
+[0.3.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.1.0
