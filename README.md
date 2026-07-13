@@ -263,8 +263,8 @@ Shipped: protocol · mock/safe/live modes · htmx inspector (with Turbo, Unpoly 
 Datastar probes, verified end to end) · error-status mocks · controls · response
 viewer · a11y lint · search · deep-links · keyboard nav · copy-as-curl ·
 swap-target and out-of-band highlight · canvas background toggle · custom
-viewports · per-component autodocs · auto-reload · install via curl / npx /
-go install.
+viewports · auth header injection for live-mode previews · per-component
+autodocs · auto-reload · install via curl / npx / go install.
 
 Planned: visual regression, play/interaction functions, Homebrew. Tracked in the
 [roadmap](https://github.com/Aejkatappaja/swapbook/labels/roadmap).
@@ -289,9 +289,13 @@ Swapbook is early and deliberately scoped. Known edges:
   mutations are blocked. Mock those routes, or run against a dev database.
 - **SSE and WebSocket** connections are proxied through, but the inspector does
   not visualize their events (there is no discrete request to trace).
-- **Mocks are stateless.** A declared route returns a fixed response (a mock may
-  set a non-2xx status like 422/500 to exercise error swaps), so multi-step
-  stateful flows are out of scope.
+- **Mocks are stateless.** You can set a mock's status (200 by default, or a
+  non-2xx like 422/500 to exercise error swaps), but it returns the same
+  response on every call, so multi-step stateful flows are out of scope.
+- **Auth is global.** `--header` injects the same credential into every request
+  forwarded to the target, so a session runs as one identity; there is no
+  per-story auth. Use a throwaway dev session (it lands in your shell history),
+  never a production token.
 - **CSS.** Bare-fragment previews load your app's declared `cssSrc`. If your
   styles are code-split or purged per route, point `cssSrc` at the full
   stylesheet so previews match the app. Full-page components bring their own.

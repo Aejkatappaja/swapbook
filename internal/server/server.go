@@ -39,12 +39,23 @@ type UI struct {
 }
 
 // New builds a Server proxying to raw (":8080", "localhost:8080" or a URL).
-func New(raw string, ui UI) (*Server, error) {
+// headers are "Name: value" strings injected into every request forwarded to
+// the target, so components behind auth render in safe/live mode (e.g. a
+// session cookie). Malformed entries (no colon) are ignored.
+func New(raw string, ui UI, headers ...string) (*Server, error) {
 	t, err := normalize(raw)
 	if err != nil {
 		return nil, err
 	}
 	proxy := httputil.NewSingleHostReverseProxy(t)
+	// Inject configured auth headers into every proxied (target-bound) request,
+	// so components behind auth render in safe/live mode. Done at the transport
+	// layer (not the deprecated Director) to leave the proxy's URL/host/path
+	// rewriting untouched. The gallery's own /_swapbook fetches use http.Get,
+	// not this proxy, so they are unaffected.
+	if inject := parseHeaders(headers); len(inject) > 0 {
+		proxy.Transport = &headerInjector{headers: inject, rt: http.DefaultTransport}
+	}
 	// Stream responses through instead of buffering, so Server-Sent Events
 	// (text/event-stream) reach the preview live rather than hanging.
 	proxy.FlushInterval = -1
@@ -60,6 +71,39 @@ func New(raw string, ui UI) (*Server, error) {
 		return nil
 	}
 	return &Server{target: t, proxy: proxy, ui: ui}, nil
+}
+
+type header struct{ name, value string }
+
+// headerInjector is a RoundTripper that sets configured headers on each request
+// before delegating. Safe to mutate the request here: ReverseProxy hands the
+// transport a per-request clone, not the caller's original.
+type headerInjector struct {
+	headers []header
+	rt      http.RoundTripper
+}
+
+func (h *headerInjector) RoundTrip(req *http.Request) (*http.Response, error) {
+	for _, x := range h.headers {
+		req.Header.Set(x.name, x.value)
+	}
+	return h.rt.RoundTrip(req)
+}
+
+// parseHeaders turns "Name: value" strings into header pairs, skipping any
+// entry without a colon. The value keeps its internal spacing; only the split
+// around the first colon is trimmed.
+func parseHeaders(raw []string) []header {
+	out := make([]header, 0, len(raw))
+	for _, h := range raw {
+		name, value, ok := strings.Cut(h, ":")
+		name = strings.TrimSpace(name)
+		if !ok || name == "" {
+			continue
+		}
+		out = append(out, header{name: name, value: strings.TrimSpace(value)})
+	}
+	return out
 }
 
 func normalize(raw string) (*url.URL, error) {

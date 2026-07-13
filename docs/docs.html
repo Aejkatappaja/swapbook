@@ -239,9 +239,11 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
       <tbody>
         <tr><td><code>--target</code></td><td><code>:8080</code></td><td>Address of the app to proxy. Accepts <code>:8080</code>, <code>localhost:8080</code> or a full URL.</td></tr>
         <tr><td><code>--port</code></td><td><code>7007</code></td><td>Port the Swapbook UI is served on.</td></tr>
+        <tr><td><code>--header</code></td><td></td><td>Header injected into every request to the target, as <code>Name: value</code>. Repeatable, so components behind auth render in live mode.</td></tr>
         <tr><td><code>--version</code></td><td></td><td>Print the version and exit.</td></tr>
       </tbody>
     </table>
+    <div class="note">Previews behind auth: in <code>safe</code>/<code>live</code> mode a preview hits your real app, so protected routes return 401. Pass the credential with <code>--header 'Cookie: session=...'</code> (repeatable) and Swapbook injects it into every proxied request. Use a throwaway dev session, never a production token; it appears in your shell history.</div>
     <p class="muted">The UI auto-reloads when your app rebuilds and reconnects if the target goes down. All UI assets are served <code>no-store</code>, so a rebuilt binary never serves a stale gallery.</p>
 
     <h2 id="adapters">Adapters <span class="k">// built-in &amp; custom</span></h2>
@@ -276,7 +278,8 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
       <li><b>htmx is the verified path, any version.</b> Previews load your app's own htmx via <code>htmxSrc</code>, so they run whatever version you ship (1.x or 2.x); the embedded fallback is htmx 2.0.4. The Turbo, Unpoly and Datastar probes are best-effort; they are exercised against the real libraries in a browser end-to-end test, but htmx remains the most complete path.</li>
       <li><b>Auto-triggering components.</b> A preview with <code>hx-trigger="load"</code> or polling (<code>every 2s</code>) fires real GET requests in mock and safe mode; only mutations are blocked. Mock those routes, or use a dev database.</li>
       <li><b>SSE and WebSocket</b> connections are proxied through, but the inspector does not visualize their events.</li>
-      <li><b>Mocks are stateless.</b> A mock returns a fixed response (it may set a non-2xx status like 422/500 to exercise error swaps), so stateful multi-step flows are out of scope.</li>
+      <li><b>Mocks are stateless.</b> You can set a mock's status (200 by default, or a non-2xx like 422/500 to exercise error swaps), but it returns the same response on every call, so stateful multi-step flows are out of scope.</li>
+      <li><b>Auth is global.</b> <code>--header</code> injects the same credential into every request forwarded to the target, so a session runs as one identity (no per-story auth). Use a throwaway dev session, never a production token.</li>
       <li><b>CSS.</b> Bare-fragment previews load your app's <code>cssSrc</code>. If your styles are code-split or purged per route, point <code>cssSrc</code> at the full stylesheet.</li>
     </ul>
     <div class="note">Swapbook strips security headers and proxies your app, so it is a local dev tool only. <b>Never run it in production or expose it publicly.</b></div>

@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"runtime/debug"
+	"strings"
 
 	"github.com/Aejkatappaja/swapbook/internal/server"
 )
@@ -40,10 +41,24 @@ func resolvedVersion() string {
 	return version
 }
 
+// headerFlags collects repeatable --header values ("Name: value").
+type headerFlags []string
+
+func (h *headerFlags) String() string { return strings.Join(*h, ", ") }
+func (h *headerFlags) Set(v string) error {
+	if !strings.Contains(v, ":") {
+		return fmt.Errorf("expected \"Name: value\", got %q", v)
+	}
+	*h = append(*h, v)
+	return nil
+}
+
 func main() {
 	target := flag.String("target", ":8080", "target app address (host:port or URL)")
 	port := flag.String("port", "7007", "port to serve the Swapbook UI on")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	var headers headerFlags
+	flag.Var(&headers, "header", "header injected into every request to the target, e.g. --header 'Cookie: session=...' (repeatable) so components behind auth render in live mode")
 	flag.Parse()
 
 	if *showVersion {
@@ -55,7 +70,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load ui: %v", err)
 	}
-	srv, err := server.New(*target, ui)
+	srv, err := server.New(*target, ui, headers...)
 	if err != nil {
 		log.Fatalf("bad target: %v", err)
 	}
@@ -63,6 +78,9 @@ func main() {
 	addr := ":" + *port
 	fmt.Printf("swapbook → target %s\n", *target)
 	fmt.Printf("open      http://localhost:%s%s/\n", *port, server.Overlay)
+	if len(headers) > 0 {
+		fmt.Printf("auth      injecting %d header(s) into target requests (live/safe mode)\n", len(headers))
+	}
 	log.Fatal(http.ListenAndServe(addr, srv.Handler()))
 }
 

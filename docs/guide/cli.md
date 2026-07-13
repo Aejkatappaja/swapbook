@@ -13,7 +13,25 @@ swapbook [flags]
 | --- | --- | --- |
 | `--target` | `:8080` | Address of the running app to proxy. Accepts `:8080`, `localhost:8080` or a full URL like `http://127.0.0.1:3000`. |
 | `--port` | `7007` | Port the Swapbook UI is served on. |
+| `--header` | | Header injected into every request forwarded to the target, as `Name: value`. Repeatable. |
 | `--version` | | Print the version and exit. |
+
+## Auth for protected routes
+
+In `safe` and `live` mode a preview's requests hit your real app, so components
+behind auth get a `401`/redirect. Pass the credential your app expects with
+`--header` and Swapbook injects it into every request it forwards to the target:
+
+```
+swapbook --target :8080 --header 'Cookie: session=<a-valid-dev-session>'
+# repeatable, and works for any header
+swapbook --target :8080 --header 'Authorization: Bearer <token>' --header 'X-Tenant: acme'
+```
+
+The gallery's own `/_swapbook` calls are not proxied, so they are unaffected;
+only requests to your app carry the header. Because the value is a real
+credential and appears in your shell history and process list, use a throwaway
+dev session and never a production token. This is a local dev tool only.
 
 ## Examples
 
