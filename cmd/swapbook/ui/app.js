@@ -519,6 +519,14 @@ function currentStoryList() {
 }
 
 // ---- inspector ------------------------------------------------------------
+// The log is append-only per frame; a chatty SSE/WS stream could grow it without
+// bound, so keep only the most recent rows (memory + paint stay bounded).
+const MAX_LOG = 400;
+function appendEvent(li) {
+  const log = el("events");
+  log.appendChild(li);
+  while (log.children.length > MAX_LOG) log.removeChild(log.firstChild);
+}
 function clearEvents() {
   el("events").innerHTML = "";
   el("a11y").innerHTML = "";
@@ -536,6 +544,7 @@ window.addEventListener("message", (e) => {
   }
   if (msg.event === "frame:ready") return onReady(msg.data || {});
   if (msg.event === "a11y") return onA11y(msg.data || {});
+  if (msg.event.indexOf("stream") === 0) return onStream(msg);
   onNetwork(msg);
 });
 
@@ -559,6 +568,22 @@ function toCurl(d) {
     return `curl -X ${d.verb} ${h} ${body} '${url}'`.replace(/\s+/g, " ");
   }
   return `curl ${h} '${url}'`;
+}
+
+// attachPeek adds a collapsible <pre> payload to a row, toggled by its .peek
+// span. viewLabel is the collapsed text (e.g. "view ▾"); the expanded label is
+// derived from it. Shared by the network and stream renderers.
+function attachPeek(li, text, viewLabel) {
+  const pre = document.createElement("pre");
+  pre.className = "resp";
+  pre.hidden = true;
+  pre.textContent = text;
+  const peek = /** @type {HTMLElement} */ (li.querySelector(".peek"));
+  peek.onclick = () => {
+    pre.hidden = !pre.hidden;
+    peek.textContent = pre.hidden ? viewLabel : viewLabel.replace("view", "hide").replace("▾", "▴");
+  };
+  li.appendChild(pre);
 }
 
 function onNetwork(msg) {
@@ -590,19 +615,30 @@ function onNetwork(msg) {
   }
   const curlEl = /** @type {HTMLElement} */ (li.querySelector(".curl"));
   if (curlEl) curlEl.onclick = () => copyToClipboard(curlEl, toCurl(d), "⧉ curl");
-  if (d.response) {
-    const pre = document.createElement("pre");
-    pre.className = "resp";
-    pre.hidden = true;
-    pre.textContent = d.response;
-    const peek = /** @type {HTMLElement} */ (li.querySelector(".peek"));
-    peek.onclick = () => {
-      pre.hidden = !pre.hidden;
-      peek.textContent = pre.hidden ? "view response ▾" : "hide response ▴";
-    };
-    li.appendChild(pre);
-  }
-  el("events").appendChild(li);
+  if (d.response) attachPeek(li, d.response, "view response ▾");
+  appendEvent(li);
+}
+
+// onStream renders SSE / WebSocket lifecycle rows. Long-lived connections have
+// no request/response pair, so each open/message/send/close/error is one line,
+// tagged by kind (SSE/WS) and direction, with an expandable payload.
+const STREAM_LABEL = { streamOpen: "open", streamClose: "close", streamError: "error" };
+function onStream(msg) {
+  const d = msg.data || {};
+  const label = msg.event === "streamMsg" ? (d.dir === "send" ? "send ↑" : "recv ↓") : STREAM_LABEL[msg.event] || msg.event;
+  const li = document.createElement("li");
+  li.className = "evt evt-stream" + (msg.event === "streamError" ? " evt-responseError" : "");
+  const bits = [
+    `<span class="etag stream-${esc(d.kind || "")}">${esc(d.kind || "stream")}</span>`,
+    `<span class="sdir">${esc(label)}</span>`,
+    d.path ? `<code>${esc(d.path)}</code>` : "",
+    d.code != null ? `<span class="ms">code ${esc(d.code)}</span>` : "",
+    d.bytes != null ? `<span class="bytes">${d.bytes}B</span>` : "",
+    d.data ? `<span class="peek">view ▾</span>` : "",
+  ].filter(Boolean);
+  li.innerHTML = bits.join(" ");
+  if (d.data) attachPeek(li, d.data, "view ▾");
+  appendEvent(li);
 }
 
 function onA11y(data) {

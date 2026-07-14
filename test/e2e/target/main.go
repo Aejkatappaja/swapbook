@@ -8,6 +8,7 @@ package main
 import (
 	"embed"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -44,6 +45,20 @@ const datastarPage = `<!doctype html>
 <button id="go-post" data-on-click="@post('/save')">save</button>
 </body></html>`
 
+// Opens an EventSource after load (so the inspector's stream wrap is in place)
+// and shows the latest event. Full-page doc, so only the inspector is injected.
+const ssePage = `<!doctype html>
+<html><head><meta charset="utf-8"></head>
+<body>
+<div id="log">waiting</div>
+<script>
+  addEventListener("load", function () {
+    var es = new EventSource("/sse");
+    es.addEventListener("message", function (e) { document.getElementById("log").textContent = e.data; });
+  });
+</script>
+</body></html>`
+
 func registry() *adapter.Registry {
 	reg := adapter.New()
 	// A mocked GET (should reroute) and an unmocked POST (should be blocked).
@@ -56,6 +71,7 @@ func registry() *adapter.Registry {
 	story("turbo", turboPage)
 	story("unpoly", unpolyPage)
 	story("datastar", datastarPage)
+	reg.Register("sse", adapter.Var("default", adapter.HTML(ssePage)))
 	return reg
 }
 
@@ -66,6 +82,21 @@ func main() {
 	reg := registry()
 	mux := http.NewServeMux()
 	mux.Handle(adapter.MountPath+"/", http.StripPrefix(adapter.MountPath, reg.Handler()))
+	// A short Server-Sent Events stream: two events then close. Swapbook proxies
+	// it through (FlushInterval -1), and the inspector's stream lens logs it.
+	mux.HandleFunc("/sse", func(w http.ResponseWriter, r *http.Request) {
+		fl, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "no flush", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		for i := 1; i <= 2; i++ {
+			fmt.Fprintf(w, "data: tick %d\n\n", i)
+			fl.Flush()
+		}
+	})
 	mux.HandleFunc("/static/", func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(r.URL.Path, "/static/")
 		b, err := vendor.ReadFile("vendor/" + name)

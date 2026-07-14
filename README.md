@@ -263,9 +263,10 @@ Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md).
 Shipped: protocol · mock/safe/live modes · htmx inspector (with Turbo, Unpoly and
 Datastar probes, verified end to end) · error-status mocks · controls · response
 viewer · a11y lint · search · deep-links · keyboard nav · copy-as-curl ·
-swap-target and out-of-band highlight · canvas background toggle · custom
-viewports · auth header injection for live-mode previews · per-component
-autodocs · auto-reload · install via curl / npx / go install.
+swap-target and out-of-band highlight · SSE / WebSocket inspector · canvas
+background toggle · custom viewports · auth header injection for live-mode
+previews · per-component autodocs · auto-reload · install via curl / npx /
+go install.
 
 Planned: visual regression, play/interaction functions, Homebrew. Tracked in the
 [roadmap](https://github.com/Aejkatappaja/swapbook/labels/roadmap).
@@ -288,8 +289,10 @@ Swapbook is early and deliberately scoped. Known edges:
 - **Auto-triggering components.** A preview with `hx-trigger="load"` or polling
   (`every 2s`) fires real GET requests to your app in mock and safe mode; only
   mutations are blocked. Mock those routes, or run against a dev database.
-- **SSE and WebSocket** connections are proxied through, but the inspector does
-  not visualize their events (there is no discrete request to trace).
+- **SSE and WebSocket** connections are proxied through and the inspector logs
+  their lifecycle (open, each default `message`/frame with direction, close).
+  They are observed, not gated: unlike an HTTP request, a streamed connection is
+  never mocked or blocked, and named SSE events are not yet surfaced.
 - **Mocks are stateless.** You can set a mock's status (200 by default, or a
   non-2xx like 422/500 to exercise error swaps), but it returns the same
   response on every call, so multi-step stateful flows are out of scope.

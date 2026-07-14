@@ -344,6 +344,48 @@
     }, 120);
   }
 
+  // ---- SSE / WebSocket lens -----------------------------------------------
+  // Long-lived connections have no discrete request to trace, so wrap the
+  // EventSource and WebSocket constructors and stream their lifecycle (open,
+  // each message, send, close, error) to the chrome. Observational only: the
+  // connection is never rerouted or blocked, since it is not a mock-able request.
+  function streamMsg(kind, path, dir, data) {
+    var s = typeof data === "string" ? data : "[binary]";
+    send("streamMsg", { kind: kind, path: path, dir: dir, data: s.slice(0, 2000), bytes: s.length });
+  }
+  // wrap replaces a stream constructor with one that logs open + each message +
+  // error, keeps prototype/static constants intact, and runs extra() for the
+  // per-kind pieces (SSE close-method override; WS close event + send wrap).
+  function wrap(Orig, kind, statics, extra) {
+    var Wrapped = function (url, arg) {
+      var inst = arg !== undefined ? new Orig(url, arg) : new Orig(url);
+      var path = pathOf(url);
+      send("streamOpen", { kind: kind, path: path });
+      inst.addEventListener("message", function (ev) { streamMsg(kind, path, "recv", ev.data); });
+      inst.addEventListener("error", function () { send("streamError", { kind: kind, path: path }); });
+      extra(inst, path);
+      return inst;
+    };
+    Wrapped.prototype = Orig.prototype;
+    statics.forEach(function (k) { Wrapped[k] = Orig[k]; });
+    return Wrapped;
+  }
+  function wireStreams() {
+    if (W.EventSource) {
+      W.EventSource = wrap(W.EventSource, "SSE", ["CONNECTING", "OPEN", "CLOSED"], function (es, path) {
+        var close = es.close.bind(es);
+        es.close = function () { send("streamClose", { kind: "SSE", path: path }); return close(); };
+      });
+    }
+    if (W.WebSocket) {
+      W.WebSocket = wrap(W.WebSocket, "WS", ["CONNECTING", "OPEN", "CLOSING", "CLOSED"], function (ws, path) {
+        ws.addEventListener("close", function (ev) { send("streamClose", { kind: "WS", path: path, code: ev && ev.code }); });
+        var origSend = ws.send.bind(ws);
+        ws.send = function (data) { streamMsg("WS", path, "send", data); return origSend(data); };
+      });
+    }
+  }
+
   // ---- Wire up ------------------------------------------------------------
 
   var PROBES = [htmxProbe, turboProbe, unpolyProbe, datastarProbe];
@@ -361,6 +403,7 @@
         attached.push(p.name);
       }
     });
+    wireStreams();
     send("frame:ready", { mode: mode, libs: attached });
     onContentChange();
     if (document.body && window.MutationObserver) {

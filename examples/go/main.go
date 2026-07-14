@@ -6,14 +6,37 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	adapter "github.com/Aejkatappaja/swapbook/adapters/go"
 )
+
+// A component that opens an SSE connection; the inspector's stream lens logs the
+// open + each streamed event. EventSource is created on load so the inspector's
+// wrap is already in place. Raw HTML (no templating) since it is static.
+const sseFrag = `<div class="card">
+  <div class="card-head"><strong>Live feed</strong><span class="badge badge-open">SSE</span></div>
+  <ul id="feed" class="muted" style="margin:10px 0 0;padding-left:18px"><li>connecting…</li></ul>
+</div>
+<script>
+  addEventListener("load", function () {
+    var es = new EventSource("/sse"), feed = document.getElementById("feed"), n = 0;
+    es.addEventListener("message", function (e) {
+      if (n === 0) feed.innerHTML = "";
+      var li = document.createElement("li");
+      li.textContent = e.data;
+      feed.appendChild(li);
+      // close after the last event so it does not auto-reconnect and replay
+      if (++n >= 5) es.close();
+    });
+  });
+</script>`
 
 func tmpl(s string) *template.Template { return template.Must(template.New("c").Parse(s)) }
 
@@ -161,6 +184,11 @@ func registry() *adapter.Registry {
 			Doc("Click **Save**: the mock replies `422`, so `hx-target-422` swaps in the error alert. The inspector logs the request with its failing status."),
 	)
 
+	reg.RegisterIn("interactive", "Live feed",
+		adapter.Var("default", adapter.HTML(sseFrag)).
+			Doc("Opens an SSE connection to `/sse`. Watch the inspector's stream lens log the open and each streamed event."),
+	)
+
 	reg.RegisterIn("web components", "Skeleton (phantom-ui)",
 		adapter.Var("loading", phantom(true, "shimmer")),
 		adapter.Var("loaded", phantom(false, "shimmer")),
@@ -192,6 +220,26 @@ func main() {
 	mux.HandleFunc("/static/ds.css", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		w.Write(dsCSS)
+	})
+	// SSE endpoint for the "Live feed" story: a handful of events, then close.
+	mux.HandleFunc("/sse", func(w http.ResponseWriter, r *http.Request) {
+		fl, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		for i := 1; i <= 5; i++ {
+			select {
+			case <-r.Context().Done():
+				return
+			default:
+			}
+			fmt.Fprintf(w, "data: event %d at %s\n\n", i, time.Now().Format("15:04:05"))
+			fl.Flush()
+			time.Sleep(900 * time.Millisecond)
+		}
 	})
 	addr := ":" + *port
 	log.Println("demo target on " + addr)

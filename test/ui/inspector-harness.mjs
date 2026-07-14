@@ -31,6 +31,17 @@ export async function loadInspector(opts = {}) {
   if (libs.includes("turbo")) w.Turbo = {};
   if (libs.includes("unpoly")) w.up = { on: (name, fn) => { upHandlers[name] = fn; } };
   if (libs.includes("datastar")) w.Datastar = {};
+  // Fake EventSource / WebSocket the inspector's stream lens wraps. Each stores
+  // listeners and exposes emit() so a test can drive the connection lifecycle.
+  class FakeStream {
+    constructor(url) { this.url = url; this._h = {}; }
+    addEventListener(n, f) { (this._h[n] ??= []).push(f); }
+    emit(n, ev) { (this._h[n] || []).forEach((f) => f(ev)); }
+    close() {}
+    send() {}
+  }
+  w.EventSource = FakeStream;
+  w.WebSocket = FakeStream;
   w.postMessage = (m) => messages.push(m); // send() posts to parent === window here
 
   const s = w.document.createElement("script");
