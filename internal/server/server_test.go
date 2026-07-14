@@ -219,12 +219,12 @@ func TestNormalize(t *testing.T) {
 		"http://example.com:123": "http://example.com:123",
 	}
 	for in, want := range cases {
-		u, err := normalize(in)
+		u, err := Normalize(in)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if u.String() != want {
-			t.Errorf("normalize(%q) = %q, want %q", in, u.String(), want)
+			t.Errorf("Normalize(%q) = %q, want %q", in, u.String(), want)
 		}
 	}
 }

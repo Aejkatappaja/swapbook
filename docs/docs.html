@@ -244,6 +244,12 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
       </tbody>
     </table>
     <div class="note">Previews behind auth: in <code>safe</code>/<code>live</code> mode a preview hits your real app, so protected routes return 401. Pass the credential with <code>--header 'Cookie: session=...'</code> (repeatable) and Swapbook injects it into every proxied request. Use a throwaway dev session, never a production token; it appears in your shell history.</div>
+    <h3>Headless check (CI)</h3>
+    <p><code>swapbook check --target :8080</code> renders every story and variant once and exits non-zero if any fail, so a build can gate on it. It reports one line per variant and fails on an unreachable target, a missing adapter, a non-2xx preview, or an empty render. A render + reachability smoke; visual-diff and a11y gating are tracked separately.</p>
+    <pre><code>swapbook check --target :8080
+<span class="c">  ok   Button · primary
+  FAIL Card · empty: preview 500
+  29 preview(s), 1 failed</span></code></pre>
     <p class="muted">The UI auto-reloads when your app rebuilds and reconnects if the target goes down. All UI assets are served <code>no-store</code>, so a rebuilt binary never serves a stale gallery.</p>
 
     <h2 id="adapters">Adapters <span class="k">// built-in &amp; custom</span></h2>
