@@ -16,6 +16,30 @@ swapbook [flags]
 | `--header` | | Header injected into every request forwarded to the target, as `Name: value`. Repeatable. |
 | `--version` | | Print the version and exit. |
 
+## Headless check (CI)
+
+`swapbook check` renders every story and variant once and exits non-zero if any
+fail, so you can gate a build on it without opening the gallery:
+
+```
+swapbook check --target :8080
+```
+
+It fetches the manifest, requests each `preview`, and reports one line per
+variant, failing on an unreachable target, a missing adapter, a non-2xx preview,
+or an empty render:
+
+```
+swapbook check → http://localhost:8080
+  ok   Button · primary
+  FAIL Card · empty: preview 500
+29 preview(s), 1 failed
+```
+
+In CI, start your app (with the adapter mounted under a dev flag), then run the
+check against it. This is a render + reachability smoke; screenshot/visual-diff
+and an a11y gate are tracked separately.
+
 ## Auth for protected routes
 
 In `safe` and `live` mode a preview's requests hit your real app, so components

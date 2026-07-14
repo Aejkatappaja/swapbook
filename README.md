@@ -265,8 +265,8 @@ Datastar probes, verified end to end) · error-status mocks · controls · respo
 viewer · a11y lint · search · deep-links · keyboard nav · copy-as-curl ·
 swap-target and out-of-band highlight · SSE / WebSocket inspector · canvas
 background toggle · custom viewports · auth header injection for live-mode
-previews · per-component autodocs · auto-reload · install via curl / npx /
-go install.
+previews · headless `check` for CI · per-component autodocs · auto-reload ·
+install via curl / npx / go install.
 
 Planned: visual regression, play/interaction functions, Homebrew. Tracked in the
 [roadmap](https://github.com/Aejkatappaja/swapbook/labels/roadmap).

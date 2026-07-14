@@ -48,6 +48,8 @@ for row in "${TARGETS[@]}"; do
   echo "$frame" | grep -q '"GET /ds/row":"/__sb/mock/todo-list/default/0"' && echo "  ✓ mock route mapped" || { echo "  ✗ mock route"; ok=0; }
   echo "$mock" | grep -q 'New task' && echo "  ✓ mock render" || { echo "  ✗ mock render"; ok=0; }
   curl -s -o /dev/null -w "%{http_code}" "http://localhost:$uport/__sb/htmx.min.js" | grep -q 200 && echo "  ✓ embedded htmx served" || { echo "  ✗ embedded htmx"; ok=0; }
+  # headless CI gate: every story/variant must render (exit 0)
+  "$BIN" check --target ":$tport" >/dev/null 2>&1 && echo "  ✓ swapbook check" || { echo "  ✗ swapbook check"; ok=0; }
 
   kill $spid $tpid 2>/dev/null
   wait $spid $tpid 2>/dev/null

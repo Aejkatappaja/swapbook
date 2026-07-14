@@ -13,9 +13,11 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"strings"
 
+	"github.com/Aejkatappaja/swapbook/internal/check"
 	"github.com/Aejkatappaja/swapbook/internal/server"
 )
 
@@ -54,6 +56,13 @@ func (h *headerFlags) Set(v string) error {
 }
 
 func main() {
+	// `swapbook check --target ...` is a headless CI gate: render every story and
+	// exit non-zero on failure. Dispatched before the default server flags.
+	if len(os.Args) > 1 && os.Args[1] == "check" {
+		runCheck(os.Args[2:])
+		return
+	}
+
 	target := flag.String("target", ":8080", "target app address (host:port or URL)")
 	port := flag.String("port", "7007", "port to serve the Swapbook UI on")
 	showVersion := flag.Bool("version", false, "print version and exit")
@@ -82,6 +91,22 @@ func main() {
 		fmt.Printf("auth      injecting %d header(s) into target requests (live/safe mode)\n", len(headers))
 	}
 	log.Fatal(http.ListenAndServe(addr, srv.Handler()))
+}
+
+// runCheck handles `swapbook check`: a headless render smoke over every story,
+// exiting 1 on any failure (or a setup error) so CI can gate on it.
+func runCheck(args []string) {
+	fs := flag.NewFlagSet("check", flag.ExitOnError)
+	target := fs.String("target", ":8080", "target app address (host:port or URL)")
+	fs.Parse(args)
+	failed, err := check.Run(*target, os.Stdout)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "swapbook check:", err)
+		os.Exit(1)
+	}
+	if failed > 0 {
+		os.Exit(1)
+	}
 }
 
 func loadUI() (server.UI, error) {

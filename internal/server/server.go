@@ -43,7 +43,7 @@ type UI struct {
 // the target, so components behind auth render in safe/live mode (e.g. a
 // session cookie). Malformed entries (no colon) are ignored.
 func New(raw string, ui UI, headers ...string) (*Server, error) {
-	t, err := normalize(raw)
+	t, err := Normalize(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func parseHeaders(raw []string) []header {
 	return out
 }
 
-func normalize(raw string) (*url.URL, error) {
+func Normalize(raw string) (*url.URL, error) {
 	if !strings.Contains(raw, "://") {
 		if strings.HasPrefix(raw, ":") {
 			raw = "localhost" + raw
