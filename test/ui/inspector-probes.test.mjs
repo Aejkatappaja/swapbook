@@ -85,3 +85,40 @@ test("datastar: live mode forwards untouched to the original fetch", async () =>
   assert.equal(sb.events("blocked").length, 0);
   sb.close();
 });
+
+// ---- SSE / WebSocket lens (wraps EventSource / WebSocket) ------------------
+
+test("SSE: open, message and close are streamed to the chrome", async () => {
+  const sb = await loadInspector({ libs: ["htmx"] });
+  const es = new sb.w.EventSource("http://localhost/app/events");
+  assert.equal(sb.events("streamOpen").length, 1);
+  assert.equal(sb.events("streamOpen")[0].data.kind, "SSE");
+  assert.equal(sb.events("streamOpen")[0].data.path, "/app/events");
+
+  es.emit("message", { data: "tick 1" });
+  const msgs = sb.events("streamMsg");
+  assert.equal(msgs.length, 1);
+  assert.equal(msgs[0].data.dir, "recv");
+  assert.equal(msgs[0].data.data, "tick 1");
+
+  es.close();
+  assert.equal(sb.events("streamClose").length, 1);
+  sb.close();
+});
+
+test("WebSocket: send and receive are tagged by direction", async () => {
+  const sb = await loadInspector({ libs: ["htmx"] });
+  const ws = new sb.w.WebSocket("ws://localhost/app/ws");
+  assert.equal(sb.events("streamOpen")[0].data.kind, "WS");
+
+  ws.send("hello");
+  ws.emit("message", { data: "world" });
+  const msgs = sb.events("streamMsg");
+  assert.deepEqual(msgs.map((m) => m.data.dir), ["send", "recv"]);
+  assert.equal(msgs[0].data.data, "hello");
+  assert.equal(msgs[1].data.data, "world");
+
+  ws.emit("close", { code: 1000 });
+  assert.equal(sb.events("streamClose")[0].data.code, 1000);
+  sb.close();
+});

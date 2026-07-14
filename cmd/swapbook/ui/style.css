@@ -299,6 +299,9 @@ pre.resp {
 .mocked { color: var(--purple); font-size: 12px; }
 .evt-info .etag { color: var(--sage); }
 .evt-nav .etag { color: var(--peach); }
+.evt-stream .etag { color: var(--teal); }
+.evt-stream .stream-WS { color: var(--purple); }
+.sdir { color: var(--comment); font-size: 12px; }
 
 .params {
   width: 100%; margin: 3px 0 0 96px; padding: 5px 9px;
