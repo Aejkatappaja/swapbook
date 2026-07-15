@@ -106,6 +106,50 @@ test("SSE: open, message and close are streamed to the chrome", async () => {
   sb.close();
 });
 
+// ---- Play (scripted interactions + assertions) ----------------------------
+
+const waitForDone = async (sb) => {
+  for (let i = 0; i < 400 && sb.events("play:done").length === 0; i++) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
+};
+const play = (sb, steps) =>
+  sb.w.dispatchEvent(new sb.w.MessageEvent("message", { data: { source: "swapbook-cmd", cmd: "play", steps } }));
+
+test("play: runs click + assertion and reports all steps passing", async () => {
+  const sb = await loadInspector({ body: '<ul id="rows"></ul><button id="add">add</button>' });
+  // simulate the swap a click would trigger
+  sb.w.document.getElementById("add").addEventListener("click", () => {
+    sb.w.document.getElementById("rows").innerHTML = "<li>New task</li>";
+  });
+  play(sb, [
+    { action: "click", target: "#add" },
+    { action: "expect-text", target: "#rows", text: "New task" },
+  ]);
+  await waitForDone(sb);
+  const done = sb.events("play:done")[0].data;
+  assert.equal(done.ok, true);
+  assert.equal(done.passed, 2);
+  assert.equal(sb.events("play:result").length, 2);
+  assert.ok(sb.events("play:result").every((r) => r.data.ok));
+  sb.close();
+});
+
+test("play: stops at the first failing assertion", async () => {
+  const sb = await loadInspector({ body: '<div id="out">nope</div>' });
+  play(sb, [
+    { action: "expect-text", target: "#out", text: "yes" }, // fails (polls, then gives up)
+    { action: "click", target: "#never" }, // never reached
+  ]);
+  await waitForDone(sb);
+  const done = sb.events("play:done")[0].data;
+  assert.equal(done.ok, false);
+  assert.equal(done.passed, 0);
+  assert.equal(sb.events("play:result").length, 1);
+  assert.equal(sb.events("play:result")[0].data.ok, false);
+  sb.close();
+});
+
 test("WebSocket: send and receive are tagged by direction", async () => {
   const sb = await loadInspector({ libs: ["htmx"] });
   const ws = new sb.w.WebSocket("ws://localhost/app/ws");

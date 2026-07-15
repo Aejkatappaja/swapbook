@@ -101,6 +101,32 @@ func (a Args) Bool(k string) bool {
 
 func parseBool(s string) bool { return s == "true" || s == "1" || s == "on" }
 
+// Step is one action in a variant's play: a scripted interaction or assertion
+// run against the rendered preview in the browser. Target is a CSS selector.
+type Step struct {
+	Action string `json:"action"` // click | type | expect-text | expect-visible | wait
+	Target string `json:"target,omitempty"`
+	Value  string `json:"value,omitempty"` // typed text, for "type"
+	Text   string `json:"text,omitempty"`  // expected substring, for "expect-text"
+}
+
+// Click clicks the element at target.
+func Click(target string) Step { return Step{Action: "click", Target: target} }
+
+// Type sets an input's value to value (firing input/change), at target.
+func Type(target, value string) Step { return Step{Action: "type", Target: target, Value: value} }
+
+// ExpectText asserts target's text contains text (waits for it to appear).
+func ExpectText(target, text string) Step {
+	return Step{Action: "expect-text", Target: target, Text: text}
+}
+
+// ExpectVisible asserts target exists and is visible (waits for it).
+func ExpectVisible(target string) Step { return Step{Action: "expect-visible", Target: target} }
+
+// Wait blocks until target appears in the DOM (e.g. after an htmx swap).
+func Wait(target string) Step { return Step{Action: "wait", Target: target} }
+
 // Variant is one rendered state of a component (e.g. "empty", "with-data").
 type Variant struct {
 	Name      string
@@ -109,6 +135,14 @@ type Variant struct {
 	Build     func(Args) Renderer // set for variants with live controls
 	Mocks     []Mock
 	Docs      string // markdown notes shown in the Swapbook docs tab
+	PlaySteps []Step // scripted interactions + assertions, run on demand
+}
+
+// Play attaches a scripted interaction + assertion sequence to the variant, run
+// on demand in the preview so a story can drive and verify a flow. Chainable.
+func (v Variant) Play(steps ...Step) Variant {
+	v.PlaySteps = append(v.PlaySteps, steps...)
+	return v
 }
 
 // Var is a shorthand constructor for a static Variant.

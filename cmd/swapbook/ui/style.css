@@ -143,13 +143,13 @@ main { position: relative; z-index: 1; display: flex; flex-direction: column; mi
 .seg-label { color: var(--comment); font-size: 11px; }
 .modes, .widths, .bgs { display: flex; gap: 4px; }
 
-.widths button, .modes button, .bgs button, #clear, #open-tab, #copy-link {
+.widths button, .modes button, .bgs button, #clear, #run-play, #open-tab, #copy-link {
   background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-dim);
   font: inherit; font-size: 12px; padding: 3px 10px; border-radius: var(--r);
   cursor: pointer; transition: border-color var(--t), color var(--t), background var(--t);
 }
 .widths button:hover, .modes button:hover, .bgs button:hover,
-#clear:hover, #open-tab:hover, #copy-link:hover {
+#clear:hover, #run-play:hover, #open-tab:hover, #copy-link:hover {
   color: var(--fg-bright); border-color: var(--cyan);
 }
 .widths button.active, .bgs button.active { color: var(--fg-bright); border-color: var(--cyan); background: var(--bg-cursor); }
@@ -239,7 +239,8 @@ main { position: relative; z-index: 1; display: flex; flex-direction: column; mi
   padding: 6px 12px; font-size: 12px;
   border-bottom: 1px solid var(--border);
 }
-.ins-head #clear { margin-left: auto; }
+.ins-head #run-play, .ins-head #clear { margin-left: auto; }
+#run-play { color: var(--sage); }
 .tabs { display: flex; gap: 3px; }
 .tab {
   background: none; border: 0; color: var(--comment); font: inherit; font-size: 12px;

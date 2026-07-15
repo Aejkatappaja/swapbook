@@ -120,6 +120,7 @@
     <a href="#controls">Controls</a>
     <a href="#mocks">Mocks</a>
     <a href="#modes">Modes</a>
+    <a href="#play">Play</a>
     <div class="grp">reference</div>
     <a href="#cli">CLI</a>
     <a href="#visual">Visual regression</a>
@@ -234,6 +235,16 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
     </table>
     <p class="muted">A request already rerouted to a mock is never blocked; a non-mutating <code>GET</code> is never blocked.</p>
     <p>The inspector normalizes htmx and, best effort, Turbo / Unpoly / Datastar. Long-lived <b>SSE and WebSocket</b> connections get their own lens: open, each message (with direction), and close are logged, so streamed updates are traceable even though there is no discrete request.</p>
+
+    <h2 id="play">Play <span class="k">// drive &amp; verify</span></h2>
+    <p>A variant can attach a <b>play</b>: scripted interactions plus assertions so a story drives and verifies a flow, not just renders a state. Hit <b>▶ play</b> and each step runs against the preview, reporting pass or fail. Steps are declarative (<code>click</code>, <code>type</code>, <code>expect-text</code>, <code>expect-visible</code>, <code>wait</code>), authored in the adapter's own language, so no <code>eval</code> and the same vocabulary works across stacks.</p>
+    <pre><code>adapter.<span class="fn">Var</span>(<span class="st">"default"</span>, <span class="fn">TodoList</span>()).
+    <span class="fn">Mock</span>(<span class="st">"GET /ds/row"</span>, <span class="fn">TodoRow</span>()).
+    <span class="fn">Play</span>(
+        adapter.<span class="fn">Click</span>(<span class="st">`[hx-get="/ds/row"]`</span>),
+        adapter.<span class="fn">ExpectText</span>(<span class="st">"#rows"</span>, <span class="st">"New task"</span>),
+    )</code></pre>
+    <p class="muted">Assertions poll for a few seconds, so a check after a click sees the htmx swap. A play stops at the first failing step, and pairs naturally with mock mode (drive the flow with no auth or DB).</p>
 
     <h2 id="cli">CLI <span class="k">// flags</span></h2>
     <table>

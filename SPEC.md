@@ -54,6 +54,24 @@ Returns the gallery contents and asset hints.
 }
 ```
 
+A variant may be a bare name string (above) or an object carrying optional
+metadata: `{ "name", "controls", "docs", "play" }`. `play` is a list of
+declarative steps the UI can run against the rendered preview to drive and
+verify a flow, each `{ "action", "target"?, "value"?, "text"? }`:
+
+```jsonc
+"play": [
+  { "action": "click",         "target": "#save" },
+  { "action": "type",          "target": "#email", "value": "a@b.c" },
+  { "action": "expect-text",   "target": "#msg", "text": "saved" },
+  { "action": "expect-visible","target": "#row" },
+  { "action": "wait",          "target": "#row" }
+]
+```
+
+Steps are data, not code, so the UI interprets them (no `eval`) and any adapter
+can emit them. Running a play is a UI concern; the protocol only carries it.
+
 ### 2. Preview (required)
 
 ```

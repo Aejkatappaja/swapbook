@@ -100,3 +100,29 @@ to htmx requests fired from inside a story:
 The gating runs in the injected inspector, which normalizes htmx (and, best
 effort, Turbo / Unpoly / Datastar) request lifecycles. A request already
 rerouted to a mock is never blocked; a non-mutating `GET` is never blocked.
+
+## Play (scripted interactions + assertions)
+
+A variant can attach a **play**: a sequence of interactions and assertions so a
+story drives and verifies a flow, not just renders a state. Hit **▶ play** in
+the inspector and each step runs against the preview, reporting pass or fail.
+
+Steps are declarative (`click`, `type`, `expect-text`, `expect-visible`,
+`wait`), authored in your adapter's own language rather than JS, so there is no
+`eval` and the same vocabulary works across stacks. In Go:
+
+```go
+reg.RegisterIn("interactive", "Todo list",
+    adapter.Var("default", TodoList()).
+        Mock("GET /ds/row", TodoRow()).
+        Play(
+            adapter.Click(`[hx-get="/ds/row"]`),
+            adapter.ExpectText("#rows", "New task"),
+        ),
+)
+```
+
+Assertions wait: `ExpectText` / `ExpectVisible` / `Wait` poll for a few seconds,
+so an assertion after a click sees the result of the htmx swap. A play stops at
+the first failing step. It pairs naturally with mock mode, drive the flow with
+canned responses, no auth or DB.

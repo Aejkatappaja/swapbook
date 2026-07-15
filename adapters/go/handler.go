@@ -31,6 +31,7 @@ type variantMeta struct {
 	Name     string    `json:"name"`
 	Controls []Control `json:"controls,omitempty"`
 	Docs     string    `json:"docs,omitempty"`
+	Play     []Step    `json:"play,omitempty"`
 }
 
 // MockMeta is the wire shape of a variant's mocked route, shared with the
@@ -74,7 +75,7 @@ func (r *Registry) serveManifest(w http.ResponseWriter, _ *http.Request) {
 	for _, s := range r.stories {
 		vs := make([]variantMeta, len(s.Variants))
 		for i, v := range s.Variants {
-			vs[i] = variantMeta{Name: v.Name, Controls: v.Controls, Docs: v.Docs}
+			vs[i] = variantMeta{Name: v.Name, Controls: v.Controls, Docs: v.Docs, Play: v.PlaySteps}
 		}
 		m.Stories = append(m.Stories, storyMeta{
 			ID: s.ID, Name: s.Name, Group: s.Group, Docs: s.Docs, Variants: vs,
