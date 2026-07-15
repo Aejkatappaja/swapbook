@@ -18,8 +18,8 @@ TARGETS=(
   "python|python3 examples/python/target.py|9090|7101|raw Python server"
   "node|node examples/node/target.js|9091|7102|raw Node server"
   "ruby|ruby examples/ruby/target.rb|9092|7103|raw Ruby server"
-  "flask|PYTHONPATH=adapters/flask python3 examples/flask/app.py|9093|7104|raw Flask server"
-  "express|NODE_PATH=examples/express/node_modules node examples/express/target.js|9094|7105|raw Express server"
+  "flask|env PYTHONPATH=adapters/flask python3 examples/flask/app.py|9093|7104|raw Flask server"
+  "express|env NODE_PATH=examples/express/node_modules node examples/express/target.js|9094|7105|raw Express server"
 )
 
 fail=0
