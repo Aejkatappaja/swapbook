@@ -22,9 +22,19 @@ function sb_mock(string $route, callable $render, int $status = 200): array
     return ['verb' => strtoupper($verb), 'path' => $path, 'render' => $render, 'status' => $status];
 }
 
-function sb_variant(string $name, callable $render, array $controls = [], string $docs = '', array $mocks = []): array
+// A named preview width, added to the built-in full/tablet/phone.
+function sb_viewport(string $name, string $w): array { return ['name' => $name, 'w' => $w]; }
+
+// Play steps: scripted interactions + assertions run against the preview.
+function sb_click(string $target): array { return ['action' => 'click', 'target' => $target]; }
+function sb_type(string $target, string $value): array { return ['action' => 'type', 'target' => $target, 'value' => $value]; }
+function sb_expect_text(string $target, string $text): array { return ['action' => 'expect-text', 'target' => $target, 'text' => $text]; }
+function sb_expect_visible(string $target): array { return ['action' => 'expect-visible', 'target' => $target]; }
+function sb_wait(string $target): array { return ['action' => 'wait', 'target' => $target]; }
+
+function sb_variant(string $name, callable $render, array $controls = [], string $docs = '', array $mocks = [], array $play = []): array
 {
-    return compact('name', 'render', 'controls', 'docs', 'mocks');
+    return compact('name', 'render', 'controls', 'docs', 'mocks', 'play');
 }
 
 class Swapbook
@@ -34,6 +44,8 @@ class Swapbook
     public string $htmxSrc = '';
     public string $cssSrc = '';
     public string $jsSrc = '';
+    /** @var array<array{name:string,w:string}> named preview widths */
+    public array $viewports = [];
 
     public function register(string $name, array $variants, string $group = '', string $docs = ''): void
     {
@@ -128,13 +140,24 @@ class Swapbook
 
     private function manifest(): array
     {
-        return [
+        $vmeta = function ($v) {
+            $m = ['name' => $v['name'], 'controls' => $v['controls'], 'docs' => $v['docs']];
+            if (!empty($v['play'])) {
+                $m['play'] = $v['play'];
+            }
+            return $m;
+        };
+        $out = [
             'htmxSrc' => $this->htmxSrc, 'cssSrc' => $this->cssSrc, 'jsSrc' => $this->jsSrc,
             'stories' => array_map(fn($s) => [
                 'id' => $s['id'], 'name' => $s['name'], 'group' => $s['group'], 'docs' => $s['docs'],
-                'variants' => array_map(fn($v) => ['name' => $v['name'], 'controls' => $v['controls'], 'docs' => $v['docs']], $s['variants']),
+                'variants' => array_map($vmeta, $s['variants']),
             ], $this->stories),
         ];
+        if ($this->viewports) {
+            $out['viewports'] = $this->viewports;
+        }
+        return $out;
     }
 
     private function json(array $o): array { return [200, 'application/json', json_encode($o)]; }

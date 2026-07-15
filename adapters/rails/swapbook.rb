@@ -22,13 +22,24 @@ module Swapbook
     { verb: verb.upcase, path: path, render: render, status: status }
   end
 
-  def self.variant(name, render, controls: [], docs: "", mocks: [])
-    { name: name, render: render, controls: controls, docs: docs, mocks: mocks }
+  # A named preview width, added to the built-in full/tablet/phone.
+  def self.viewport(name, w) = { name: name, w: w }
+
+  # Play steps: scripted interactions + assertions run against the preview.
+  def self.click(target) = { action: "click", target: target }
+  def self.type(target, value) = { action: "type", target: target, value: value }
+  def self.expect_text(target, text) = { action: "expect-text", target: target, text: text }
+  def self.expect_visible(target) = { action: "expect-visible", target: target }
+  def self.wait(target) = { action: "wait", target: target }
+
+  def self.variant(name, render, controls: [], docs: "", mocks: [], play: [])
+    { name: name, render: render, controls: controls, docs: docs, mocks: mocks, play: play }
   end
 
   class Registry
-    def initialize(htmx_src: "", css_src: "", js_src: "")
+    def initialize(htmx_src: "", css_src: "", js_src: "", viewports: [])
       @htmx_src, @css_src, @js_src = htmx_src, css_src, js_src
+      @viewports = viewports
       @stories = []
       @global_mocks = []
     end
@@ -69,15 +80,23 @@ module Swapbook
     private
 
     def manifest
-      {
+      m = {
         htmxSrc: @htmx_src, cssSrc: @css_src, jsSrc: @js_src,
         stories: @stories.map { |s|
           {
             id: s[:id], name: s[:name], group: s[:group], docs: s[:docs],
-            variants: s[:variants].map { |v| { name: v[:name], controls: v[:controls], docs: v[:docs] } },
+            variants: s[:variants].map { |v| vmeta(v) },
           }
         },
       }
+      m[:viewports] = @viewports unless @viewports.empty?
+      m
+    end
+
+    def vmeta(v)
+      m = { name: v[:name], controls: v[:controls], docs: v[:docs] }
+      m[:play] = v[:play] if v[:play] && !v[:play].empty?
+      m
     end
 
     def find(sid, vname)

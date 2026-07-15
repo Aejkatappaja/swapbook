@@ -159,7 +159,7 @@ reg.<span class="fn">RegisterIn</span>(<span class="st">"actions"</span>, <span 
     adapter.<span class="fn">Var</span>(<span class="st">"secondary"</span>, <span class="fn">Button</span>(<span class="st">"Cancel"</span>, <span class="st">"secondary"</span>)),
 )
 reg.<span class="fn">DocStory</span>(<span class="st">"Button"</span>, <span class="st">"The button primitive."</span>)</code></pre>
-    <p class="muted">Viewports set via <code>reg.Viewports</code> appear in the toolbar's width bar next to the built-in full/tablet/phone, and the width you pick is remembered per story. Other stacks emit the same <code>viewports</code> list in their manifest.</p>
+    <p class="muted">Viewports set via <code>reg.Viewports</code> appear in the toolbar's width bar next to the built-in full/tablet/phone, and the width you pick is remembered per story. Other stacks take a <code>viewports</code> arg on the registry too (Django/Rails/PHP).</p>
 
     <h3>Django</h3>
     <pre><code><span class="kw">from</span> swapbook_adapter <span class="kw">import</span> Registry, variant
