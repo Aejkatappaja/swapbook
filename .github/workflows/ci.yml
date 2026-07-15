@@ -112,12 +112,12 @@ jobs:
       - name: build visual image
         run: docker build -f test/e2e/Dockerfile.visual -t swapbook-visual .
       - name: diff every variant against its baseline
-        run: docker run --rm -v "$PWD/test/e2e/test-results:/work/test/e2e/test-results" swapbook-visual
+        run: docker run --rm -v "$PWD/test/e2e/playwright-report:/work/test/e2e/playwright-report" swapbook-visual
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: visual-diff
-          path: test/e2e/test-results
+          name: visual-diff-report # open index.html for the expected/actual/diff viewer
+          path: test/e2e/playwright-report
           if-no-files-found: ignore
 
   smoke:

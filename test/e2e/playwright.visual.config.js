@@ -15,7 +15,9 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  reporter: process.env.CI ? "line" : "list",
+  // HTML report gives an interactive expected/actual/diff viewer (with a slider)
+  // for any drifted variant; uploaded as a CI artifact on failure.
+  reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: `http://localhost:${SB_PORT}`,
   },
