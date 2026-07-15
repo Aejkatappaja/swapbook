@@ -193,6 +193,26 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
 <span class="c">// route /_swapbook/* to:</span>
 [$status, $ct, $body] = $sb-&gt;<span class="fn">handle</span>($method, $path, $query);</code></pre>
 
+    <h3>Flask</h3>
+    <pre><code><span class="kw">from</span> swapbook <span class="kw">import</span> Registry, variant
+
+reg = <span class="fn">Registry</span>(css_src=<span class="st">"/static/app.css"</span>)
+reg.<span class="fn">register</span>(<span class="st">"Button"</span>, [
+    <span class="fn">variant</span>(<span class="st">"primary"</span>, <span class="kw">lambda</span> a: render_button(<span class="st">"Save"</span>)),
+], group=<span class="st">"actions"</span>)
+
+app.<span class="fn">register_blueprint</span>(reg.blueprint)</code></pre>
+
+    <h3>Express</h3>
+    <pre><code><span class="kw">const</span> { Registry, variant } = <span class="fn">require</span>(<span class="st">"swapbook"</span>);
+
+<span class="kw">const</span> reg = <span class="kw">new</span> <span class="fn">Registry</span>({ cssSrc: <span class="st">"/static/app.css"</span> });
+reg.<span class="fn">register</span>(<span class="st">"Button"</span>, [
+    <span class="fn">variant</span>(<span class="st">"primary"</span>, () =&gt; renderButton(<span class="st">"Save"</span>)),
+], { group: <span class="st">"actions"</span> });
+
+app.<span class="fn">use</span>(reg.<span class="fn">router</span>());</code></pre>
+
     <h3>Any other stack</h3>
     <p>There is no adapter requirement. Answer the four endpoints under <code>/_swapbook</code> in any language and Swapbook drives it. See the <a href="#protocol">protocol</a> and the stdlib examples in <code>examples/{python,node,ruby}/</code>.</p>
 
@@ -274,7 +294,7 @@ docker run --rm -v "$PWD/test/e2e/visual:/work/test/e2e/visual" swapbook-visual 
     <p>Baselines and the comparison run in a pinned Docker image (Playwright + Go) so local and CI renders are byte-identical. On a mismatch, CI uploads an interactive expected/actual/diff report. Full walkthrough in the <a href="https://github.com/Aejkatappaja/swapbook/blob/main/docs/guide/visual-regression.md">visual regression guide</a>.</p>
 
     <h2 id="adapters">Adapters <span class="k">// built-in &amp; custom</span></h2>
-    <p>An adapter is the small render-agnostic piece in your app that answers the protocol. Built-in adapters live under <code>adapters/{go,django,rails,php}/</code>, with runnable demos under <code>examples/</code>.</p>
+    <p>An adapter is the small render-agnostic piece in your app that answers the protocol. Built-in adapters live under <code>adapters/{go,django,rails,php,flask,express}/</code>, with runnable demos under <code>examples/</code>.</p>
     <table>
       <thead><tr><th>stack</th><th>mount</th></tr></thead>
       <tbody>

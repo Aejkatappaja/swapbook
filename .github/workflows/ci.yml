@@ -136,4 +136,6 @@ jobs:
         with:
           ruby-version: "3.2"
       - run: gem install webrick --no-document # dropped from Ruby's default gems in 3.0
+      - run: pip install flask # for the Flask adapter demo
+      - run: npm install --prefix examples/express # express, for the Express adapter demo
       - run: bash examples/smoke.sh

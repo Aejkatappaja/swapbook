@@ -13,9 +13,11 @@ versions of a framework.
 | Django | `from swapbook_adapter import Registry` | `urlpatterns = reg.urls` |
 | Rails | `require "swapbook"` | `mount REG => "/_swapbook"` |
 | Laravel / PHP | `require "swapbook.php"` | route `/_swapbook/*` to `$sb->handle(...)` |
+| Flask | `from swapbook import Registry` | `app.register_blueprint(reg.blueprint)` |
+| Express | `require("swapbook")` | `app.use(reg.router())` |
 
-The adapter source lives under `adapters/{go,django,rails,php}/`. Runnable demos
-for every stack are under `examples/`.
+The adapter source lives under `adapters/{go,django,rails,php,flask,express}/`.
+Runnable demos for every stack are under `examples/`.
 
 ## Writing your own
 

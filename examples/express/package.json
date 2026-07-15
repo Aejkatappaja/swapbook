@@ -1,0 +1,8 @@
+{
+  "name": "swapbook-express-example",
+  "private": true,
+  "description": "Swapbook demo target on Express, using the Express adapter.",
+  "dependencies": {
+    "express": "^4.19.0"
+  }
+}
