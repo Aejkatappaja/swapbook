@@ -102,6 +102,24 @@ jobs:
         working-directory: test/e2e
         run: npm test
 
+  visual:
+    name: visual regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The screenshots run in a pinned image (fonts + browser) so they match the
+      # committed baselines byte for byte, which a native runner would not.
+      - name: build visual image
+        run: docker build -f test/e2e/Dockerfile.visual -t swapbook-visual .
+      - name: diff every variant against its baseline
+        run: docker run --rm -v "$PWD/test/e2e/playwright-report:/work/test/e2e/playwright-report" swapbook-visual
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: visual-diff-report # open index.html for the expected/actual/diff viewer
+          path: test/e2e/playwright-report
+          if-no-files-found: ignore
+
   smoke:
     name: protocol smoke (python/node/ruby)
     runs-on: ubuntu-latest

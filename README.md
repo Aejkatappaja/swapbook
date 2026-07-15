@@ -244,6 +244,7 @@ Full guides live in [`docs/guide/`](docs/guide/):
 - [CLI reference](docs/guide/cli.md): flags and usage.
 - [Adapters](docs/guide/adapters.md): built-in adapters and writing your own.
 - [Authoring an adapter](docs/guide/authoring-adapters.md): derive a new adapter for any stack from the protocol.
+- [Visual regression](docs/guide/visual-regression.md): screenshot variants and diff against a baseline in CI.
 
 The [protocol spec](SPEC.md) documents the four endpoints an app implements.
 Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -265,10 +266,10 @@ Datastar probes, verified end to end) · error-status mocks · controls · respo
 viewer · a11y lint · search · deep-links · keyboard nav · copy-as-curl ·
 swap-target and out-of-band highlight · SSE / WebSocket inspector · canvas
 background toggle · custom viewports · auth header injection for live-mode
-previews · headless `check` for CI · per-component autodocs · auto-reload ·
-install via curl / npx / go install.
+previews · headless `check` for CI · visual regression · per-component autodocs ·
+auto-reload · install via curl / npx / go install.
 
-Planned: visual regression, play/interaction functions, Homebrew. Tracked in the
+Planned: play/interaction functions, Homebrew. Tracked in the
 [roadmap](https://github.com/Aejkatappaja/swapbook/labels/roadmap).
 
 ## Status

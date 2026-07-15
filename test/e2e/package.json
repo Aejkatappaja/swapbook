@@ -3,7 +3,11 @@
   "private": true,
   "type": "module",
   "description": "Playwright E2E: exercises the inspector probes against real Turbo/Unpoly/Datastar apps behind the Swapbook binary.",
-  "scripts": { "test": "playwright test" },
+  "scripts": {
+    "test": "playwright test",
+    "test:visual": "playwright test -c playwright.visual.config.js",
+    "test:visual:update": "playwright test -c playwright.visual.config.js --update-snapshots"
+  },
   "devDependencies": {
     "@playwright/test": "^1.48.0"
   }
