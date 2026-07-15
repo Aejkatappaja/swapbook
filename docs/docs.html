@@ -122,6 +122,7 @@
     <a href="#modes">Modes</a>
     <div class="grp">reference</div>
     <a href="#cli">CLI</a>
+    <a href="#visual">Visual regression</a>
     <a href="#adapters">Adapters</a>
     <a href="#protocol">Protocol</a>
     <a href="#limitations">Limitations</a>
@@ -232,6 +233,7 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
       </tbody>
     </table>
     <p class="muted">A request already rerouted to a mock is never blocked; a non-mutating <code>GET</code> is never blocked.</p>
+    <p>The inspector normalizes htmx and, best effort, Turbo / Unpoly / Datastar. Long-lived <b>SSE and WebSocket</b> connections get their own lens: open, each message (with direction), and close are logged, so streamed updates are traceable even though there is no discrete request.</p>
 
     <h2 id="cli">CLI <span class="k">// flags</span></h2>
     <table>
@@ -251,6 +253,14 @@ $sb-&gt;<span class="fn">register</span>(<span class="st">"Button"</span>, [
   FAIL Card · empty: preview 500
   29 preview(s), 1 failed</span></code></pre>
     <p class="muted">The UI auto-reloads when your app rebuilds and reconnects if the target goes down. All UI assets are served <code>no-store</code>, so a rebuilt binary never serves a stale gallery.</p>
+
+    <h2 id="visual">Visual regression <span class="k">// screenshot &amp; diff</span></h2>
+    <p>Beyond "does it render", Swapbook can catch changes to how a component <em>looks</em>. A small <a href="https://playwright.dev">Playwright</a> harness screenshots every variant and diffs it against a committed baseline, so an accidental swap in your CSS fails the build. Screenshots need a browser, so this is a harness (the binary stays dependency-free) rather than a binary command.</p>
+    <pre><code><span class="c"># compare against baselines (what CI runs)</span>
+docker run --rm swapbook-visual
+<span class="c"># refresh baselines after an intended change</span>
+docker run --rm -v "$PWD/test/e2e/visual:/work/test/e2e/visual" swapbook-visual npm run test:visual:update</code></pre>
+    <p>Baselines and the comparison run in a pinned Docker image (Playwright + Go) so local and CI renders are byte-identical. On a mismatch, CI uploads an interactive expected/actual/diff report. Full walkthrough in the <a href="https://github.com/Aejkatappaja/swapbook/blob/main/docs/guide/visual-regression.md">visual regression guide</a>.</p>
 
     <h2 id="adapters">Adapters <span class="k">// built-in &amp; custom</span></h2>
     <p>An adapter is the small render-agnostic piece in your app that answers the protocol. Built-in adapters live under <code>adapters/{go,django,rails,php}/</code>, with runnable demos under <code>examples/</code>.</p>
