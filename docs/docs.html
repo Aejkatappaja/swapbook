@@ -274,7 +274,7 @@ docker run --rm -v "$PWD/test/e2e/visual:/work/test/e2e/visual" swapbook-visual 
     <p>Baselines and the comparison run in a pinned Docker image (Playwright + Go) so local and CI renders are byte-identical. On a mismatch, CI uploads an interactive expected/actual/diff report. Full walkthrough in the <a href="https://github.com/Aejkatappaja/swapbook/blob/main/docs/guide/visual-regression.md">visual regression guide</a>.</p>
 
     <h2 id="adapters">Adapters <span class="k">// built-in &amp; custom</span></h2>
-    <p>An adapter is the small render-agnostic piece in your app that answers the protocol. Built-in adapters live under <code>adapters/{go,django,rails,php}/</code>, with runnable demos under <code>examples/</code>.</p>
+    <p>An adapter is the small render-agnostic piece in your app that answers the protocol. Built-in adapters live under <code>adapters/{go,django,rails,php,flask,express}/</code>, with runnable demos under <code>examples/</code>.</p>
     <table>
       <thead><tr><th>stack</th><th>mount</th></tr></thead>
       <tbody>

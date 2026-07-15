@@ -275,9 +275,9 @@ Planned: Homebrew tap. Tracked in the
 
 ## Status
 
-Early. The protocol is proven across seven stacks with tests: Go/templ, Django,
-Rails and Laravel via adapters, plus dependency-free Python, Node and Ruby
-targets. Interfaces may still shift before a tagged release.
+Early. The protocol is proven across nine stacks with tests: Go/templ, Django,
+Rails, Laravel, Flask and Express via adapters, plus dependency-free Python,
+Node and Ruby targets. Interfaces may still shift before a tagged release.
 
 ## Limitations
 
