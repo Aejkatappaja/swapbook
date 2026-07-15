@@ -5,7 +5,8 @@
 
 /**
  * @typedef {{ name: string, type: string, default?: unknown, options?: string[] }} Control
- * @typedef {{ name: string, controls?: Control[], docs?: string }} VariantObj
+ * @typedef {{ action: string, target?: string, value?: string, text?: string }} PlayStep
+ * @typedef {{ name: string, controls?: Control[], docs?: string, play?: PlayStep[] }} VariantObj
  * @typedef {string | VariantObj} Variant  variants may be a bare name (hand-rolled targets) or an object
  * @typedef {{ id: string, name: string, group?: string, docs?: string, variants: Variant[] }} Story
  * @typedef {{ name: string, w: string }} Viewport  a project-declared preview width
@@ -49,11 +50,13 @@ try {
 /** @type {{ story: Story, variant: Variant } | null} */ let current = null;
 /** @type {Record<string, any>} */ let args = {};
 let docsView = false; // showing a story's autodocs page
+let frameReady = false; // preview frame's inspector has announced itself (frame:ready)
 /** @type {string | null} */ let manifestRaw = ""; // last manifest body; null = target down
 
 /** @param {Variant} v */ const vName = (v) => (typeof v === "string" ? v : v.name);
 /** @param {Variant} v @returns {Control[]} */ const vControls = (v) => (typeof v === "string" ? [] : v.controls || []);
 /** @param {Variant} v */ const vDocs = (v) => (typeof v === "string" ? "" : v.docs || "");
+/** @param {Variant} v @returns {PlayStep[]} */ const vPlay = (v) => (typeof v === "string" ? [] : v.play || []);
 /** @param {unknown} s */ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 /** typed DOM helpers (checkJs-friendly). @param {string} sel @param {ParentNode} [root] @returns {HTMLElement[]} */
 const qsa = (sel, root = document) => /** @type {HTMLElement[]} */ (Array.from(root.querySelectorAll(sel)));
@@ -97,6 +100,7 @@ async function fetchManifest() {
 
 async function boot() {
   renderBars();
+  el("run-play").onclick = runPlay;
   const m = await fetchManifest();
   if (m.state === "ok") {
     applyManifest(m.text);
@@ -174,6 +178,7 @@ function selectVariant(story, v, stateArgs, width) {
   setActiveStory();
   renderControls(vControls(v));
   renderDocs(vDocs(v));
+  el("run-play").hidden = vPlay(v).length === 0;
   // Resolve the viewport once: an explicit width (from the URL) wins, else the
   // one last used for this story, else full. Applied without persisting, since
   // only a deliberate pick should write the story's remembered width.
@@ -186,6 +191,7 @@ function selectDocs(story) {
   docsView = true;
   current = { story, variant: story.variants[0] };
   args = {};
+  el("run-play").hidden = true;
   el("current").innerHTML = `<span class="p">$</span> ${esc(story.name)} · docs`;
   renderControls([]);
   renderDocs("");
@@ -329,6 +335,7 @@ function frameUrl() {
 
 function loadFrame() {
   if (!current) return;
+  frameReady = false; // set true when the frame's inspector announces itself
   el("current").innerHTML =
     `<span class="p">$</span> ${esc(current.story.name)} · ${esc(vName(current.variant))}`;
   clearEvents();
@@ -544,11 +551,46 @@ window.addEventListener("message", (e) => {
   }
   if (msg.event === "frame:ready") return onReady(msg.data || {});
   if (msg.event === "a11y") return onA11y(msg.data || {});
+  if (msg.event.indexOf("play:") === 0) return onPlay(msg);
   if (msg.event.indexOf("stream") === 0) return onStream(msg);
   onNetwork(msg);
 });
 
+// runPlay sends the current variant's play steps into the preview frame; the
+// inspector runs them and streams results back (handled by onPlay).
+function runPlay() {
+  if (!current) return;
+  const steps = vPlay(current.variant);
+  if (!steps.length) return;
+  if (!frameReady) return; // preview still loading; its inspector isn't listening yet
+  clearEvents();
+  const info = document.createElement("li");
+  info.className = "evt evt-info";
+  info.innerHTML = `<span class="etag">play</span> <span class="muted">running ${steps.length} step(s)…</span>`;
+  el("events").appendChild(info);
+  el("preview").contentWindow.postMessage({ source: "swapbook-cmd", cmd: "play", steps }, "*");
+}
+
+// onPlay renders one row per play step (pass/fail) plus a final summary.
+function onPlay(msg) {
+  const d = msg.data || {};
+  const li = document.createElement("li");
+  if (msg.event === "play:done") {
+    li.className = "evt evt-info";
+    li.innerHTML = `<span class="etag">play</span> <span class="${d.ok ? "mocked" : "blocked"}">${d.ok ? "✓ passed" : "✗ failed"} ${d.passed}/${d.total}</span>`;
+  } else {
+    li.className = "evt evt-" + (d.ok ? "mock" : "blocked");
+    li.innerHTML = [
+      `<span class="etag">${d.ok ? "✓" : "✗"} ${esc(d.action)}</span>`,
+      d.target ? `<code>${esc(d.target)}</code>` : "",
+      d.detail ? `<span class="blocked">${esc(d.detail)}</span>` : "",
+    ].filter(Boolean).join(" ");
+  }
+  appendEvent(li);
+}
+
 function onReady(data) {
+  frameReady = true;
   clearEvents();
   // htmx is verified end-to-end; the other probes are best-effort, so flag them.
   const libs = (data.libs || []).map((/** @type {string} */ l) => (l === "htmx" ? l : l + " (beta)"));

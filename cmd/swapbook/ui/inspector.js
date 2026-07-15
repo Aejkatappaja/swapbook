@@ -386,6 +386,86 @@
     }
   }
 
+  // ---- Play: scripted interactions + assertions ---------------------------
+  // The chrome posts { source: "swapbook-cmd", cmd: "play", steps } into this
+  // frame; we run each step against the DOM and report the outcome back. Steps
+  // are declarative (click / type / expect-text / expect-visible / wait), so no
+  // eval and the vocabulary is shared with the adapters.
+  function q(sel) {
+    try { return document.querySelector(sel); } catch (_) { return null; }
+  }
+  // waitFor polls for target up to ms; resolves with the element once it exists
+  // and (if given) pred(el) holds, else null on timeout.
+  function waitFor(sel, ms, pred) {
+    return new Promise(function (resolve) {
+      var t0 = performance.now();
+      (function poll() {
+        var el = q(sel);
+        if (el && (!pred || pred(el))) return resolve(el);
+        if (performance.now() - t0 > ms) return resolve(null);
+        setTimeout(poll, 50);
+      })();
+    });
+  }
+  async function runStep(s) {
+    if (s.action === "click") {
+      var el = await waitFor(s.target, 2000);
+      if (!el) return "no element at " + s.target;
+      el.click();
+      return "";
+    }
+    if (s.action === "type") {
+      var input = await waitFor(s.target, 2000);
+      if (!input) return "no element at " + s.target;
+      input.value = s.value;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      return "";
+    }
+    if (s.action === "wait") {
+      return (await waitFor(s.target, 3000)) ? "" : "timed out waiting for " + s.target;
+    }
+    if (s.action === "expect-visible") {
+      var vis = await waitFor(s.target, 3000);
+      return vis && vis.offsetParent !== null ? "" : (vis ? "not visible" : "not found") + ": " + s.target;
+    }
+    if (s.action === "expect-text") {
+      if (s.text == null) return "expect-text step has no text";
+      var found = await waitFor(s.target, 3000, function (el) {
+        return (el.textContent || "").indexOf(s.text) !== -1;
+      });
+      return found ? "" : "expected " + s.target + ' to contain "' + s.text + '"';
+    }
+    return "unknown action: " + s.action;
+  }
+  var playing = false;
+  async function runPlay(steps) {
+    playing = true;
+    var passed = 0;
+    try {
+      for (var i = 0; i < steps.length; i++) {
+        var detail = "";
+        try {
+          detail = await runStep(steps[i]);
+        } catch (e) {
+          detail = String((e && e.message) || e);
+        }
+        var ok = detail === "";
+        send("play:result", { index: i, action: steps[i].action, target: steps[i].target, ok: ok, detail: detail });
+        if (ok) passed++;
+        else break; // stop at the first failure, like a test
+      }
+      send("play:done", { passed: passed, total: steps.length, ok: passed === steps.length });
+    } finally {
+      playing = false;
+    }
+  }
+  window.addEventListener("message", function (e) {
+    var m = e.data;
+    // ignore a re-entrant run while one is already in flight
+    if (m && m.source === "swapbook-cmd" && m.cmd === "play" && !playing) runPlay(m.steps || []);
+  });
+
   // ---- Wire up ------------------------------------------------------------
 
   var PROBES = [htmxProbe, turboProbe, unpolyProbe, datastarProbe];

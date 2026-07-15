@@ -175,7 +175,11 @@ func registry() *adapter.Registry {
 	reg.RegisterIn("interactive", "Todo list",
 		adapter.Var("default", render(todoT, nil)).
 			Mock("GET /ds/row", render(rowT, nil)).
-			Doc("Click **+ add row**: the mock returns a new `<li>` htmx appends. Watch the swap-target flash in the inspector."),
+			Play(
+				adapter.Click(`[hx-get="/ds/row"]`),
+				adapter.ExpectText("#rows", "New task"),
+			).
+			Doc("Click **+ add row**: the mock returns a new `<li>` htmx appends. Watch the swap-target flash in the inspector. Hit **▶ play** to run that interaction and assert the row was added."),
 	)
 
 	reg.RegisterIn("interactive", "Form validation",

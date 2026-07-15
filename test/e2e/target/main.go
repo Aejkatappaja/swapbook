@@ -59,6 +59,15 @@ const ssePage = `<!doctype html>
 </script>
 </body></html>`
 
+// A minimal page for the play runner: clicking #go updates #out. No library
+// needed, so the test exercises the runner + command channel in a real browser.
+const playPage = `<!doctype html>
+<html><head><meta charset="utf-8"></head>
+<body>
+<button id="go" onclick="document.getElementById('out').textContent = 'clicked'">go</button>
+<div id="out">idle</div>
+</body></html>`
+
 func registry() *adapter.Registry {
 	reg := adapter.New()
 	// A mocked GET (should reroute) and an unmocked POST (should be blocked).
@@ -72,6 +81,7 @@ func registry() *adapter.Registry {
 	story("unpoly", unpolyPage)
 	story("datastar", datastarPage)
 	reg.Register("sse", adapter.Var("default", adapter.HTML(ssePage)))
+	reg.Register("play", adapter.Var("default", adapter.HTML(playPage)))
 	return reg
 }
 

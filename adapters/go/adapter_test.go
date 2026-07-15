@@ -83,6 +83,38 @@ func TestViewportsInManifest(t *testing.T) {
 	}
 }
 
+// TestPlayInManifest proves a variant's play steps reach the manifest, and that
+// a variant without a play omits the field.
+func TestPlayInManifest(t *testing.T) {
+	reg := New()
+	reg.Register("Todo",
+		Var("default", HTML("<ul id=rows></ul>")).
+			Play(Click(`[hx-get="/row"]`), ExpectText("#rows", "New task")),
+		Var("plain", HTML("<div>x</div>")),
+	)
+	srv := httptest.NewServer(reg.Handler())
+	defer srv.Close()
+
+	resp, _ := http.Get(srv.URL + "/manifest.json")
+	var m manifest
+	if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+		t.Fatal(err)
+	}
+	vs := m.Stories[0].Variants
+	if len(vs[0].Play) != 2 {
+		t.Fatalf("play steps = %+v", vs[0].Play)
+	}
+	if vs[0].Play[0].Action != "click" || vs[0].Play[0].Target != `[hx-get="/row"]` {
+		t.Errorf("step 0 = %+v", vs[0].Play[0])
+	}
+	if vs[0].Play[1].Action != "expect-text" || vs[0].Play[1].Text != "New task" {
+		t.Errorf("step 1 = %+v", vs[0].Play[1])
+	}
+	if vs[1].Play != nil {
+		t.Errorf("variant without play should omit it, got %+v", vs[1].Play)
+	}
+}
+
 func TestGlobalMocks(t *testing.T) {
 	reg := New()
 	reg.Mock("GET /shared", HTML("GLOBAL"))
