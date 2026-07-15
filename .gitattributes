@@ -2,8 +2,11 @@
 # These overrides only affect language stats and some diff rendering; they change
 # nothing about the build or what ships.
 
-# htmx is bundled as an embedded fallback (third party), not our code.
-cmd/swapbook/ui/htmx.min.js linguist-vendored
+# The gallery UI is a frontend asset embedded into the Go binary via go:embed
+# (plain JS + CSS + HTML, plus a third-party htmx fallback). It ships inside the
+# binary rather than being the tool's language, so keep it out of the stats;
+# the bar then reflects the Go core and the polyglot adapters.
+cmd/swapbook/ui/** linguist-vendored
 
 # The landing page and docs site are documentation, not application source.
 docs/**       linguist-documentation
