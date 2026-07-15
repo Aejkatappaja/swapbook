@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-07-15
+
+### Added
+
+- **Play functions.** A variant can attach a play, a sequence of scripted
+  interactions and assertions (`click` / `type` / `expect-text` /
+  `expect-visible` / `wait`) run on demand against the preview, so a story
+  drives and verifies a flow, not just renders a state. Declarative steps
+  authored in the adapter's own language (no `eval`); hit the ▶ play button and
+  each step reports pass or fail.
+- **Flask and Express adapters.** The protocol now has built-in adapters for
+  Python's Flask (`app.register_blueprint(reg.blueprint)`) and Node's Express
+  (`app.use(reg.router())`), bringing the built-in count to six and adding both
+  to the protocol smoke suite.
+
+### Changed
+
+- **Adapter parity.** Custom viewports and play, first shipped on the Go
+  adapter, are now available on Django, Rails and PHP too, so all built-in
+  adapters expose the same feature set.
+
 ## [0.4.0] - 2026-07-15
 
 ### Added
@@ -85,6 +106,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   inspector, mock / safe / live modes, live controls, a11y lint, adapters for
   Go/templ, Django, Rails and Laravel, and install via curl / npx / go install.
 
+[0.5.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.2.0
