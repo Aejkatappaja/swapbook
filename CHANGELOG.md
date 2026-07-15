@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-15
+
+### Added
+
+- **SSE / WebSocket inspector.** The inspector wraps `EventSource` and
+  `WebSocket` and logs a long-lived connection's lifecycle (open, each message
+  with direction, close, error) in a dedicated lens, so streamed events are
+  traceable even though there is no discrete request.
+- **Headless `swapbook check`.** A CI gate that fetches the manifest, renders
+  every story/variant, and exits non-zero on failure (unreachable target,
+  missing adapter, non-2xx preview, or empty render). Previews are checked
+  concurrently while the report stays in manifest order.
+- **Visual regression.** A Playwright harness screenshots every variant and
+  diffs it against a committed baseline, so a swap that changes rendering fails
+  the build. Baselines and the comparison run in a pinned Docker image so local
+  and CI renders match; the CI job uploads an interactive expected/actual/diff
+  report on failure.
+
 ## [0.3.0] - 2026-07-13
 
 ### Added
@@ -67,6 +85,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   inspector, mock / safe / live modes, live controls, a11y lint, adapters for
   Go/templ, Django, Rails and Laravel, and install via curl / npx / go install.
 
+[0.4.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.1.0
