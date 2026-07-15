@@ -35,9 +35,38 @@ def mock(route, render, status=200):
     return {"verb": verb.upper(), "path": p or route, "render": render, "status": status}
 
 
-def variant(name, render, controls=None, docs="", mocks=None):
-    """One rendered state. render is a callable (args: dict) -> html str."""
-    return {"name": name, "render": render, "controls": controls or [], "docs": docs, "mocks": mocks or []}
+def viewport(name, w):
+    """A named preview width, added to the built-in full/tablet/phone."""
+    return {"name": name, "w": w}
+
+
+# Play steps: scripted interactions + assertions run against the preview.
+def click(target):
+    return {"action": "click", "target": target}
+
+
+def type_(target, value):
+    return {"action": "type", "target": target, "value": value}
+
+
+def expect_text(target, text):
+    return {"action": "expect-text", "target": target, "text": text}
+
+
+def expect_visible(target):
+    return {"action": "expect-visible", "target": target}
+
+
+def wait(target):
+    return {"action": "wait", "target": target}
+
+
+def variant(name, render, controls=None, docs="", mocks=None, play=None):
+    """One rendered state. render is a callable (args: dict) -> html str.
+
+    play is an optional list of steps (see click/type_/expect_text/...) run on
+    demand against the preview."""
+    return {"name": name, "render": render, "controls": controls or [], "docs": docs, "mocks": mocks or [], "play": play or []}
 
 
 def _coerce(controls, GET):
@@ -62,8 +91,9 @@ def _coerce(controls, GET):
 
 
 class Registry:
-    def __init__(self, htmx_src="", css_src="", js_src=""):
+    def __init__(self, htmx_src="", css_src="", js_src="", viewports=None):
         self.htmx_src, self.css_src, self.js_src = htmx_src, css_src, js_src
+        self.viewports = viewports or []
         self._stories = []
         self._global_mocks = []
 
@@ -99,13 +129,22 @@ class Registry:
         ]
 
     def _manifest(self, request):
-        return JsonResponse({
+        def vmeta(v):
+            m = {"name": v["name"], "controls": v["controls"], "docs": v["docs"]}
+            if v.get("play"):
+                m["play"] = v["play"]
+            return m
+
+        out = {
             "htmxSrc": self.htmx_src, "cssSrc": self.css_src, "jsSrc": self.js_src,
             "stories": [{
                 "id": s["id"], "name": s["name"], "group": s["group"], "docs": s["docs"],
-                "variants": [{"name": v["name"], "controls": v["controls"], "docs": v["docs"]} for v in s["variants"]],
+                "variants": [vmeta(v) for v in s["variants"]],
             } for s in self._stories],
-        })
+        }
+        if self.viewports:
+            out["viewports"] = self.viewports
+        return JsonResponse(out)
 
     def _preview(self, request, sid, vname):
         v = self._find(sid, vname)

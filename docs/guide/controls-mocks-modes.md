@@ -122,6 +122,10 @@ reg.RegisterIn("interactive", "Todo list",
 )
 ```
 
+The other stacks take a `play` list with matching step helpers: `play=[click(...),
+expect_text(...)]` in Django, `play: [Swapbook.click(...), ...]` in Rails, and a
+`$play` argument with `sb_click(...)` / `sb_expect_text(...)` in PHP.
+
 Assertions wait: `ExpectText` / `ExpectVisible` / `Wait` poll for a few seconds,
 so an assertion after a click sees the result of the htmx swap. A play stops at
 the first failing step. It pairs naturally with mock mode, drive the flow with

@@ -75,6 +75,23 @@ $sb3->register('Form', [
 [$st, , $body] = $sb3->handle('POST', '/_swapbook/mock/form/invalid/0', []);
 check($st === 422 && $body === '<div>invalid</div>', 'mock render honors status');
 
+// viewports + play reach the manifest (and are omitted when unset)
+$sb4 = new Swapbook();
+$sb4->viewports = [sb_viewport('wide', '1440px')];
+$sb4->register('Todo', [
+    sb_variant('default', fn($a) => '<ul id="rows"></ul>', [], '', [], [
+        sb_click('[hx-get="/row"]'),
+        sb_expect_text('#rows', 'New task'),
+    ]),
+    sb_variant('plain', fn($a) => '<div>x</div>'),
+]);
+[, , $body] = $sb4->handle('GET', '/_swapbook/manifest.json', []);
+$m4 = json_decode($body, true);
+check(($m4['viewports'][0]['name'] ?? '') === 'wide' && ($m4['viewports'][0]['w'] ?? '') === '1440px', 'viewports in manifest');
+$pv = $m4['stories'][0]['variants'][0]['play'] ?? [];
+check(count($pv) === 2 && ($pv[0]['action'] ?? '') === 'click' && ($pv[1]['text'] ?? '') === 'New task', 'play steps in manifest');
+check(!isset($m4['stories'][0]['variants'][1]['play']), 'variant without play omits it');
+
 // unknown routes -> 404
 [$st] = $sb->handle('GET', '/_swapbook/preview/nope/nope', []);
 check($st === 404, 'unknown preview 404');
