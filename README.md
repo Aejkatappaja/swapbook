@@ -178,6 +178,48 @@ $sb->register('Button', [
 // route all of /_swapbook/* to:  $sb->handle($method, $path, $query)
 ```
 
+### Flask
+
+```python
+from swapbook import Registry, control, variant
+
+reg = Registry(css_src="/static/app.css")
+reg.register("Button", group="actions", variants=[
+    variant("primary", lambda a: render_button("Save", "primary")),
+    variant("controls", lambda a: render_button(a["label"], a["variant"]), controls=[
+        control("label", "text", "Save"),
+        control("variant", "select", "primary", options=["primary", "secondary"]),
+    ]),
+])
+
+app.register_blueprint(reg.blueprint)  # mounts /_swapbook/*
+```
+
+A variant is any callable `(args) -> html str`, so Jinja templates and plain
+strings both work. Flask 2+.
+
+### Express
+
+```js
+const { Registry, control, variant } = require("swapbook");
+
+const reg = new Registry({ cssSrc: "/static/app.css" });
+reg.register("Button", [
+  variant("primary", () => renderButton("Save", "primary")),
+  variant("controls", (a) => renderButton(a.label, a.variant), {
+    controls: [
+      control("label", "text", "Save"),
+      control("variant", "select", "primary", ["primary", "secondary"]),
+    ],
+  }),
+], { group: "actions" });
+
+app.use(reg.router());  // mounts /_swapbook/*
+```
+
+A variant's render is `(args) -> HTML string`, so any template engine works.
+Requires `express`.
+
 ### Web Components
 
 Any custom element renders as-is: return the element's HTML (plus its script

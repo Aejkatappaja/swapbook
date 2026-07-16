@@ -194,7 +194,10 @@
   .itab.active { color: var(--cyan); }
   .itab .mn { color: inherit; }
   .ibadge { background: var(--line); color: var(--fg-dim); border-radius: 100px; padding: 0 6px; font-size: 9.5px; margin-left: 2px; }
-  .iclear { margin-left: auto; background: none; border: 1px solid var(--line); color: var(--comment); border-radius: 5px; font-family: var(--mono); font-size: 10px; padding: 2px 8px; cursor: pointer; }
+  .iright { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .iplay { background: none; border: 1px solid var(--line); color: var(--sage); border-radius: 5px; font-family: var(--mono); font-size: 10px; padding: 2px 8px; cursor: pointer; }
+  .iplay:hover { border-color: var(--sage); }
+  .iclear { background: none; border: 1px solid var(--line); color: var(--comment); border-radius: 5px; font-family: var(--mono); font-size: 10px; padding: 2px 8px; cursor: pointer; }
   .iclear:hover { border-color: var(--cyan); color: var(--cyan); }
   .ipanel[hidden] { display: none !important; }
   .wb-log { list-style: none; margin: 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 11.5px; overflow-y: auto; max-height: 372px; }
@@ -427,7 +430,10 @@
             <button class="itab active" data-tab="net"><span class="mn">⇄</span> network</button>
             <button class="itab" data-tab="a11y">a11y <span class="ibadge">0</span></button>
             <button class="itab" data-tab="docs">docs</button>
-            <button class="iclear" id="wbClearLog">clear</button>
+            <span class="iright">
+              <button class="iplay" id="wbPlay" hidden>▶ play</button>
+              <button class="iclear" id="wbClearLog">clear</button>
+            </span>
           </div>
           <ul class="wb-log ipanel" id="wbLog" data-panel="net"></ul>
           <div class="ipanel a11y" data-panel="a11y" hidden>✓ no violations found</div>
@@ -658,6 +664,18 @@
     document.getElementById("wbRows").innerHTML = "";
   }
 
+  // play: the variant's play steps, mirroring the real workbench exactly:
+  //   Play(Click(`[hx-get="/ds/row"]`), ExpectText("#rows", "New task"))
+  // the click drives the htmx swap, then each step reports pass/fail with a
+  // final summary, one row per step like the inspector's onPlay.
+  function playFlow() {
+    logRow({ ev: "play", note: "running 2 step(s)…" });
+    addRowFlow();
+    logRow({ ev: "✓ click", path: '[hx-get="/ds/row"]', mock: true });
+    logRow({ ev: "✓ expect-text", path: "#rows", mock: true });
+    logRow({ ev: "play", status: "✓ passed 2/2" });
+  }
+
   function select(s, v) {
     cur = { s: s, v: v };
     STORIES.forEach(function (x) { x.variants.forEach(function (y) { y._el.setAttribute("aria-current", y === v ? "true" : "false"); }); });
@@ -666,6 +684,9 @@
 
   function render() {
     var v = cur.v;
+    // ▶ play lives in the inspector toolbar (like the real chrome), shown only
+    // for a variant that has play steps.
+    document.getElementById("wbPlay").hidden = !v.todo;
     ctrls.className = "wb-ctrls"; ctrls.innerHTML = "";
     if (v.todo) {
       canvas.innerHTML =
@@ -708,6 +729,7 @@
     });
   });
   document.getElementById("wbClearLog").addEventListener("click", function () { log.innerHTML = ""; logged = false; ready(); });
+  document.getElementById("wbPlay").addEventListener("click", playFlow);
 
   var todoS = STORIES[STORIES.length - 1]; // open on Todo: the swap is the thesis
   select(todoS, todoS.variants[0]);
@@ -721,6 +743,8 @@
     Django: '<span class="tok-k">from</span> swapbook_adapter <span class="tok-k">import</span> Registry, variant, mock\n\nreg = <span class="tok-f">Registry</span>(css_src=<span class="tok-s">"/static/app.css"</span>)\nreg.<span class="tok-f">register</span>(<span class="tok-s">"Button"</span>, group=<span class="tok-s">"actions"</span>, variants=[\n    <span class="tok-f">variant</span>(<span class="tok-s">"primary"</span>, <span class="tok-k">lambda</span> a: render_button(<span class="tok-s">"Save"</span>)),\n    <span class="tok-f">variant</span>(<span class="tok-s">"empty"</span>, todo,\n        mocks=[<span class="tok-f">mock</span>(<span class="tok-s">"GET /ds/row"</span>, <span class="tok-k">lambda</span> a: <span class="tok-s">"&lt;li&gt;New&lt;/li&gt;"</span>)]),\n])\n\nurlpatterns = reg.urls  <span class="tok-c"># mounts /_swapbook/*</span>',
     Rails: '<span class="tok-k">require</span> <span class="tok-s">"swapbook"</span>\n\nREG = Swapbook::Registry.<span class="tok-f">new</span>(css_src: <span class="tok-s">"/assets/app.css"</span>)\nREG.<span class="tok-f">register</span>(<span class="tok-s">"Button"</span>, group: <span class="tok-s">"actions"</span>, variants: [\n  Swapbook.<span class="tok-f">variant</span>(<span class="tok-s">"primary"</span>, -&gt;(a) { render_button(<span class="tok-s">"Save"</span>) }),\n])\n\n<span class="tok-c"># config/routes.rb</span>\nmount REG =&gt; <span class="tok-s">"/_swapbook"</span>',
     Laravel: '<span class="tok-k">require</span> <span class="tok-s">"swapbook.php"</span>;\n\n$sb = <span class="tok-k">new</span> <span class="tok-f">Swapbook</span>();\n$sb-&gt;<span class="tok-f">register</span>(<span class="tok-s">"Button"</span>, [\n    <span class="tok-f">sb_variant</span>(<span class="tok-s">"primary"</span>, <span class="tok-k">fn</span>($a) =&gt; view(<span class="tok-s">"button"</span>)-&gt;render()),\n], <span class="tok-s">"actions"</span>);\n\n<span class="tok-c">// route /_swapbook/* -&gt; $sb-&gt;handle($method, $path, $query)</span>',
+    Flask: '<span class="tok-k">from</span> swapbook <span class="tok-k">import</span> Registry, variant, mock\n\nreg = <span class="tok-f">Registry</span>(css_src=<span class="tok-s">"/static/app.css"</span>)\nreg.<span class="tok-f">register</span>(<span class="tok-s">"Button"</span>, group=<span class="tok-s">"actions"</span>, variants=[\n    <span class="tok-f">variant</span>(<span class="tok-s">"primary"</span>, <span class="tok-k">lambda</span> a: render_button(<span class="tok-s">"Save"</span>)),\n    <span class="tok-f">variant</span>(<span class="tok-s">"empty"</span>, todo,\n        mocks=[<span class="tok-f">mock</span>(<span class="tok-s">"GET /ds/row"</span>, <span class="tok-k">lambda</span> a: <span class="tok-s">"&lt;li&gt;New&lt;/li&gt;"</span>)]),\n])\n\napp.<span class="tok-f">register_blueprint</span>(reg.blueprint)  <span class="tok-c"># mounts /_swapbook/*</span>',
+    Express: '<span class="tok-k">const</span> { Registry, variant, mock } = <span class="tok-f">require</span>(<span class="tok-s">"swapbook"</span>);\n\n<span class="tok-k">const</span> reg = <span class="tok-k">new</span> <span class="tok-f">Registry</span>({ cssSrc: <span class="tok-s">"/static/app.css"</span> });\nreg.<span class="tok-f">register</span>(<span class="tok-s">"Button"</span>, [\n  <span class="tok-f">variant</span>(<span class="tok-s">"primary"</span>, () =&gt; <span class="tok-f">renderButton</span>(<span class="tok-s">"Save"</span>)),\n  <span class="tok-f">variant</span>(<span class="tok-s">"empty"</span>, todo, {\n    mocks: [<span class="tok-f">mock</span>(<span class="tok-s">"GET /ds/row"</span>, () =&gt; <span class="tok-s">"&lt;li&gt;New&lt;/li&gt;"</span>)] }),\n], { group: <span class="tok-s">"actions"</span> });\n\napp.<span class="tok-f">use</span>(reg.<span class="tok-f">router</span>());  <span class="tok-c">// mounts /_swapbook/*</span>',
     Any: '<span class="tok-c"># no adapter required. answer four endpoints in any language:</span>\n<span class="tok-f">GET</span>  /_swapbook/manifest.json\n<span class="tok-f">GET</span>  /_swapbook/preview/{id}/{variant}\n<span class="tok-f">GET</span>  /_swapbook/mocks/{id}/{variant}\n<span class="tok-f">ANY</span>  /_swapbook/mock/{id}/{variant}/{i}\n\n<span class="tok-c"># examples/ ships stdlib targets in Python, Node and Ruby.</span>',
   };
   var tabsEl = document.getElementById("qsTabs");
