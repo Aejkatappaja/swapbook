@@ -254,8 +254,6 @@ func bgValue(name string) string {
 	}
 }
 
-// controlArgs strips Swapbook's own frame params, leaving only component
-// control args to forward to the preview render.
 // controlArgs pulls the "arg."-namespaced control values out of the frame
 // query and returns them unprefixed for the preview render. Frame params
 // (mode/bg/htmx/…) carry no prefix and are naturally excluded, so there is no
