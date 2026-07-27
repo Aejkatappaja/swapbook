@@ -706,7 +706,6 @@ function onA11y(data) {
   }
 }
 
-// tabs
 const TAB_PANELS = { net: "events", a11y: "a11y", docs: "docs" };
 qsa(".tab").forEach((t) => {
   t.onclick = () => {
@@ -727,10 +726,8 @@ el("open-tab").onclick = () => { if (current) window.open(frameUrl(), "_blank");
 const copyLinkBtn = el("copy-link");
 copyLinkBtn.onclick = () => copyToClipboard(copyLinkBtn, location.href, "link ⧉");
 
-// search
 el("story-search").oninput = debounce(() => renderStories(currentStoryList()), 120);
 
-// keyboard nav
 function moveStory(dir) {
   const btns = [...qsa(".story")];
   if (!btns.length) return;

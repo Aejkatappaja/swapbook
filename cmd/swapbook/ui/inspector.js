@@ -173,7 +173,6 @@
           send("blocked", { verb: up(rc.verb), path: rc.path, target: eltDesc(e.detail.target), params: paramsToObj(rc.parameters), lib: "htmx" });
         }
       });
-      // rich logging
       ["beforeRequest", "afterRequest", "beforeSwap", "afterSwap", "responseError"].forEach(function (n) {
         document.addEventListener("htmx:" + n, function (/** @type {any} */ e) {
           var d = e.detail || {};

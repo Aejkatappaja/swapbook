@@ -26,8 +26,9 @@ export async function boot(fetchImpl, ready) {
   });
   const w = dom.window;
   w.fetch = fetchImpl;
-  w.setInterval = () => 0; // app.js starts a 1.5s reconnect poller; skip it so
-  //                          jsdom timers don't keep the test process alive.
+  // app.js starts a 1.5s reconnect poller; skip it so jsdom timers don't keep
+  // the test process alive.
+  w.setInterval = () => 0;
 
   const s = w.document.createElement("script");
   s.textContent = APP; // top-level function decls attach to the window global
