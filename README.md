@@ -18,13 +18,18 @@
 
 ---
 
-Swapbook is a component workbench for server-rendered apps. Point it at your
-running app and it renders your components in isolation, with an htmx-aware
-inspector, live controls, and mocked interactions, so you can build and review
-UI without clicking through the whole app.
+Ever needed to see what your htmx partial looks like in its error state, the one
+that only renders after a `422`? Or its empty state, or the "a row just got
+added" state? In a running app you either trigger each one for real, or fake a
+broken backend and remember to undo it.
+
+Swapbook renders those states in isolation. Point the binary at your running app
+and it previews any component in any state through your **real** htmx, with mock
+responses so you can hit the error swap without touching your backend, plus an
+inspector that logs every request and swap.
 
 It is **framework-agnostic**: the binary speaks a tiny HTTP protocol, so it works
-with Go/templ, Django, Rails, Laravel, Flask, Phoenix, or a plain server, with
+with Go/templ, Django, Rails, Laravel, Flask, Express, or a plain server, with
 no per-framework requirement and no Node build step.
 
 ```
