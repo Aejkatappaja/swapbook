@@ -4,7 +4,9 @@
 // into a common shape ({verb, path, status, target, params}) forwarded to the
 // Swapbook chrome via postMessage. Probes also apply mock/safe-mode behavior.
 //
-// Coverage: htmx is full (mock rewrite + mutation blocking + rich logging).
+// Coverage: htmx is full (mock rewrite + mutation blocking + rich logging),
+// with one probe per generation since htmx 4 renamed every event and moved to
+// fetch(); the right one attaches based on htmx.version.
 // Turbo, Unpoly and Datastar (fetch-based) get normalized logging plus
 // best-effort mock rewrite / blocking, since each library intercepts requests
 // differently. New libraries are added by writing another probe.
@@ -24,6 +26,10 @@
 
   function up(v) {
     return (v || "").toUpperCase();
+  }
+
+  function htmxMajor() {
+    return (W.htmx && parseInt(W.htmx.version, 10)) || 0;
   }
 
   // flash: briefly outline the element a response was swapped into.
@@ -53,7 +59,8 @@
     if (!el || !el.tagName) return "";
     var s = el.tagName.toLowerCase();
     if (el.id) s += "#" + el.id;
-    var attrs = ["hx-get", "hx-post", "hx-put", "hx-delete", "hx-target", "hx-swap"];
+    var attrs = ["hx-get", "hx-post", "hx-put", "hx-delete", "hx-query",
+                 "hx-action", "hx-method", "hx-target", "hx-swap"];
     attrs.forEach(function (a) {
       if (el.getAttribute && el.getAttribute(a)) s += " " + a + '="' + el.getAttribute(a) + '"';
     });
@@ -123,6 +130,12 @@
       el.hasAttribute("hx-get") || el.hasAttribute("hx-post") ||
       el.hasAttribute("hx-put") || el.hasAttribute("hx-delete") || el.hasAttribute("hx-patch")
     ) return true;
+    // htmx 4's verb-less form. Gated on 4 actually running: a fragment authored
+    // for 4 but previewed against the embedded 2.0.4 fallback gets no htmx
+    // request at all, and deferring would let the native submit escape the story.
+    if (htmxMajor() >= 4 &&
+      (el.hasAttribute("hx-action") || el.hasAttribute("hx-method") || el.hasAttribute("hx-query"))
+    ) return true;
     // Unpoly: any element opting into unpoly navigation.
     if (active.unpoly && el.closest("[up-follow],[up-submit],[up-target],[up-layer],[up-nav],[up-href]")) return true;
     // Turbo Drive owns every same-origin link/form unless explicitly opted out.
@@ -151,10 +164,12 @@
 
   // ---- Probes -------------------------------------------------------------
 
+  // htmx 1.x / 2.x: camelCase events, XHR, request data spread over
+  // detail.requestConfig / detail.xhr / detail.pathInfo.
   var htmxProbe = {
     name: "htmx",
     detect: function () {
-      return !!W.htmx;
+      return !!W.htmx && htmxMajor() < 4;
     },
     attach: function () {
       // reroute matching requests to their mock endpoint before htmx sends them
@@ -212,6 +227,108 @@
     },
   };
 
+  // htmx 4: every event moved to colon form (`htmx:before:request`), requests
+  // go through fetch(), and the whole lifecycle hangs off one `ctx` object.
+  // Different plumbing, same normalized rows as the htmx 2 probe.
+  var htmx4Probe = {
+    name: "htmx",
+    detect: function () {
+      return htmxMajor() >= 4;
+    },
+    attach: function () {
+      // htmx 4 lets a page rename the ':' separator in its event names.
+      var mc = (W.htmx.config && W.htmx.config.metaCharacter) || ":";
+      function on(name, fn) {
+        document.addEventListener(name.replace(/:/g, mc), fn);
+      }
+      // htmx 4 folds a GET's parameters into the action and clears the body,
+      // so read them back off the query string to keep the row complete.
+      function paramsOf(r) {
+        if (r.body) return paramsToObj(r.body);
+        try {
+          return paramsToObj(new URL(r.action, location.origin).searchParams);
+        } catch (_) {
+          return null;
+        }
+      }
+      // ctx.request stops changing once config:request has run, so parse the
+      // action once per request and let the four later events copy the result.
+      function baseRow(ctx) {
+        var r = ctx.request;
+        return { lib: "htmx", verb: up(r.method), path: pathOf(r.action), params: paramsOf(r) };
+      }
+      function row(ctx) {
+        var o = Object.assign({}, ctx.sbRow || baseRow(ctx));
+        if (ctx.response) o.status = ctx.response.status;
+        if (ctx.target) o.target = eltDesc(ctx.target);
+        return o;
+      }
+
+      // config:request is the last point where request.action is still the raw
+      // route, and htmx fetches whatever it holds afterwards.
+      on("htmx:config:request", function (/** @type {any} */ e) {
+        var r = e.detail.ctx.request;
+        var path = pathOf(r.action);
+        var url = mockFor(r.method, path);
+        if (url) {
+          send("mock", { verb: up(r.method), path: path, lib: "htmx" });
+          r.action = url;
+        }
+      });
+      on("htmx:before:request", function (/** @type {any} */ e) {
+        var ctx = e.detail.ctx;
+        ctx.sbRow = baseRow(ctx);
+        if (shouldBlock(ctx.request.method, ctx.sbRow.path)) {
+          e.preventDefault(); // htmx 4 events are cancelable; this drops the fetch
+          send("blocked", row(ctx));
+          return;
+        }
+        ctx.sbStart = performance.now();
+        // ctx.request is the fetch init, so this marks the request as already
+        // gated for any probe that wraps fetch (see datastarProbe).
+        ctx.request.sbGated = true;
+        send("beforeRequest", row(ctx));
+      });
+      on("htmx:after:request", function (/** @type {any} */ e) {
+        var ctx = e.detail.ctx, o = row(ctx);
+        // wire() runs at DOMContentLoaded, after htmx has fired any
+        // hx-trigger="load" request, so the tail of one can arrive unpaired.
+        if (ctx.sbStart != null) o.ms = Math.round(performance.now() - ctx.sbStart);
+        send("afterRequest", o);
+      });
+      on("htmx:response:error", function (/** @type {any} */ e) {
+        send("responseError", row(e.detail.ctx));
+      });
+      on("htmx:before:swap", function (/** @type {any} */ e) {
+        var ctx = e.detail.ctx, o = row(ctx);
+        if (typeof ctx.text === "string") {
+          o.responseBytes = ctx.text.length;
+          o.response = ctx.text.slice(0, 6000);
+        }
+        send("beforeSwap", o); // first: this row carries the response body
+        // htmx 4 dropped the oob swap event. Every region updated outside the
+        // main target, out-of-band or hx-partial, arrives as a task on the swap
+        // plan instead. A partial whose selector matched nothing has no target.
+        ctx.sbOob = (e.detail.tasks || []).filter(function (t) {
+          return (t.type === "oob" || t.type === "partial") && t.target;
+        });
+        ctx.sbOob.forEach(function (t) {
+          send("oobSwap", { target: eltDesc(t.target), lib: "htmx" });
+        });
+      });
+      on("htmx:after:swap", function (/** @type {any} */ e) {
+        var ctx = e.detail.ctx;
+        flash(ctx.target);
+        (ctx.sbOob || []).forEach(function (t) {
+          // an outerHTML oob swap replaced the node we saw; oob targets are
+          // matched by id, so re-resolve rather than flash a detached element.
+          flash(t.target.isConnected ? t.target : document.getElementById(t.target.id));
+        });
+        send("afterSwap", row(ctx));
+      });
+    },
+  };
+
   var turboProbe = {
     name: "turbo",
     detect: function () {
@@ -264,8 +381,9 @@
     },
   };
 
-  // Datastar and other fetch-based libraries: wrap fetch. htmx uses XHR, so
-  // this does not double-count htmx traffic.
+  // Datastar and other fetch-based libraries: wrap fetch. htmx 1/2 use XHR and
+  // never land here; htmx 4 does fetch, so a request its own probe already
+  // gated arrives marked and is passed straight through, never gated twice.
   var datastarProbe = {
     name: "datastar",
     detect: function () {
@@ -274,7 +392,8 @@
     attach: function () {
       var orig = window.fetch;
       if (!orig) return;
-      window.fetch = function (/** @type {any} */ input, init) {
+      window.fetch = function (/** @type {any} */ input, /** @type {any} */ init) {
+        if (init && init.sbGated) return orig(input, init); // another probe owns it
         var raw = typeof input === "string" ? input : (input && input.url) || "";
         var verb = up((init && init.method) || (input && input.method) || "GET");
         var path = pathOf(raw);
@@ -467,7 +586,7 @@
 
   // ---- Wire up ------------------------------------------------------------
 
-  var PROBES = [htmxProbe, turboProbe, unpolyProbe, datastarProbe];
+  var PROBES = [htmxProbe, htmx4Probe, turboProbe, unpolyProbe, datastarProbe];
 
   // Wire probes after DOMContentLoaded: deferred library scripts (e.g. a
   // <script src="htmx.js" defer>) have executed by then, so detection sees
@@ -476,7 +595,8 @@
   function wire() {
     var attached = [];
     PROBES.forEach(function (p) {
-      if (p.detect()) {
+      // first match wins per name: only one htmx probe may ever attach.
+      if (!active[p.name] && p.detect()) {
         active[p.name] = true;
         p.attach();
         attached.push(p.name);

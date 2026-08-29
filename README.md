@@ -331,10 +331,13 @@ Node and Ruby targets. Interfaces may still shift before a tagged release.
 Swapbook is early and deliberately scoped. Known edges:
 
 - **htmx is the verified path, any version.** Previews load your app's own htmx
-  via `htmxSrc`, so they run whatever version you ship (1.x or 2.x); the embedded
-  fallback used when `htmxSrc` is unset is htmx 2.0.4. The Turbo, Unpoly and
-  Datastar inspector probes are best-effort; they are exercised against the real
-  libraries in a browser end-to-end test, but htmx remains the most complete path.
+  via `htmxSrc`, so they run whatever version you ship. The inspector carries one
+  probe per generation, picked from `htmx.version`: 1.x / 2.x, and htmx 4, which
+  renamed every event and moved to `fetch()`. Both mock, block and log the same
+  way. The embedded fallback used when `htmxSrc` is unset is still htmx 2.0.4.
+  The Turbo, Unpoly and Datastar inspector probes are best-effort; they are
+  exercised against the real libraries in a browser end-to-end test, but htmx
+  remains the most complete path.
 - **Auto-triggering components.** A preview with `hx-trigger="load"` or polling
   (`every 2s`) fires real GET requests to your app in mock and safe mode; only
   mutations are blocked. Mock those routes, or run against a dev database.

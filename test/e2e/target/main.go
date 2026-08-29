@@ -1,5 +1,5 @@
 // Target app for the Playwright probe E2E: one full-page story per hypermedia
-// library (Turbo, Unpoly, Datastar), each loading the real vendored library and
+// library (Turbo, Unpoly, Datastar, htmx 4), each loading the real library and
 // exposing a GET trigger (mocked -> should reroute) plus a POST trigger
 // (unmocked -> should be blocked in mock mode). The Swapbook binary runs in
 // front of this; the specs drive the triggers and assert the probe's behavior.
@@ -37,6 +37,16 @@ const unpolyPage = `<!doctype html>
 <form id="frm" up-submit up-target="#target" action="/save" method="post"><button id="go-post">save</button></form>
 </body></html>`
 
+// htmx 4 gets its own story: its event surface and fetch-based requests are a
+// different probe from htmx 1/2, and only a real browser exercises it.
+const htmx4Page = `<!doctype html>
+<html><head><meta charset="utf-8"><script src="/static/htmx4.js"></script></head>
+<body>
+<div id="target">initial</div>
+<button id="go-get" hx-get="/rows" hx-target="#target">load rows</button>
+<button id="go-post" hx-post="/save" hx-target="#target">save</button>
+</body></html>`
+
 const datastarPage = `<!doctype html>
 <html><head><meta charset="utf-8"><script type="module" src="/static/datastar.js"></script></head>
 <body data-signals="{}">
@@ -71,15 +81,17 @@ const playPage = `<!doctype html>
 func registry() *adapter.Registry {
 	reg := adapter.New()
 	// A mocked GET (should reroute) and an unmocked POST (should be blocked).
-	story := func(id string, page string) {
+	// The mock body is per-library: Turbo only swaps a matching <turbo-frame>.
+	story := func(id, page, mock string) {
 		reg.Register(id,
-			adapter.Var("default", adapter.HTML(page)).
-				Mock("GET /rows", adapter.HTML(`<turbo-frame id="tf"><div id="target">ROW</div></turbo-frame>`)),
+			adapter.Var("default", adapter.HTML(page)).Mock("GET /rows", adapter.HTML(mock)),
 		)
 	}
-	story("turbo", turboPage)
-	story("unpoly", unpolyPage)
-	story("datastar", datastarPage)
+	frame := `<turbo-frame id="tf"><div id="target">ROW</div></turbo-frame>`
+	story("turbo", turboPage, frame)
+	story("unpoly", unpolyPage, frame)
+	story("datastar", datastarPage, frame)
+	story("htmx4", htmx4Page, `<span id="row">ROW</span>`)
 	reg.Register("sse", adapter.Var("default", adapter.HTML(ssePage)))
 	reg.Register("play", adapter.Var("default", adapter.HTML(playPage)))
 	return reg

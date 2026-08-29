@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **htmx 4 support in the inspector.** htmx 4.0.0 renamed every event to colon
+  form (`htmx:before:request`), moved requests to `fetch()`, and hangs the whole
+  lifecycle off a single `ctx`. A second probe handles it, picked from
+  `htmx.version`, so mock rerouting (through `ctx.request.action`), mutation
+  blocking, timing, response bodies and out-of-band swaps work the same as they
+  do on 1.x / 2.x. Covered by a jsdom suite and a real-browser end-to-end test
+  against htmx 4.0.0.
+
 ## [0.5.0] - 2026-07-15
 
 ### Added
