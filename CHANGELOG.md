@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.0] - 2026-08-30
 
 ### Added
 
@@ -13,8 +13,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   lifecycle off a single `ctx`. A second probe handles it, picked from
   `htmx.version`, so mock rerouting (through `ctx.request.action`), mutation
   blocking, timing, response bodies and out-of-band swaps work the same as they
-  do on 1.x / 2.x. Covered by a jsdom suite and a real-browser end-to-end test
-  against htmx 4.0.0.
+  do on 1.x / 2.x. htmx 4 has no out-of-band event, so every region updated
+  outside the main target (`hx-swap-oob` and `hx-partial`) is read off the swap
+  plan. Covered by a jsdom suite and a real-browser end-to-end test against htmx
+  4.0.0. The embedded fallback htmx, used only when `htmxSrc` is unset, stays at
+  2.0.4.
 
 ## [0.5.0] - 2026-07-15
 
@@ -118,6 +121,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   inspector, mock / safe / live modes, live controls, a11y lint, adapters for
   Go/templ, Django, Rails and Laravel, and install via curl / npx / go install.
 
+[0.6.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.3.0
