@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 const SRC = readFileSync(new URL("../../cmd/swapbook/ui/inspector.js", import.meta.url), "utf8");
 
 /**
- * @param {{mode?: string, mocks?: Record<string,string>, libs?: string[], body?: string}} opts
+ * @param {{mode?: string, mocks?: Record<string,string>, libs?: string[], body?: string, htmxConfig?: Record<string,any>}} opts
  */
 export async function loadInspector(opts = {}) {
   const libs = opts.libs || ["htmx"];
@@ -27,7 +27,9 @@ export async function loadInspector(opts = {}) {
     fetchCalls.push({ input: String(input && input.url ? input.url : input), init });
     return Promise.resolve({ status: 200 });
   };
-  if (libs.includes("htmx")) w.htmx = {};
+  if (libs.includes("htmx")) w.htmx = { version: "2.0.4" };
+  // htmx 4: same global, different major, so the v4 probe attaches instead.
+  if (libs.includes("htmx4")) w.htmx = { version: "4.0.0", config: opts.htmxConfig || {} };
   if (libs.includes("turbo")) w.Turbo = {};
   if (libs.includes("unpoly")) w.up = { on: (name, fn) => { upHandlers[name] = fn; } };
   if (libs.includes("datastar")) w.Datastar = {};

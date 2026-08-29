@@ -146,7 +146,7 @@ streaming, no auth is required by the protocol itself.
 
 The protocol is independent of the client-side hypermedia library. Preview HTML
 may use htmx, and Swapbook's request interception (mock/safe modes) and inspector
-currently target htmx's event model. Support for other libraries (Turbo, Unpoly,
+target htmx's event models (1.x / 2.x, and the rewritten 4.x surface). Support for other libraries (Turbo, Unpoly,
 Datastar, Alpine-AJAX) is a Swapbook-side concern (inspector probes) and does not
 change this protocol.
 
