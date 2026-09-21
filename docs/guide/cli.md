@@ -14,6 +14,7 @@ swapbook [flags]
 | `--target` | `:8080` | Address of the running app to proxy. Accepts `:8080`, `localhost:8080` or a full URL like `http://127.0.0.1:3000`. |
 | `--port` | `7007` | Port the Swapbook UI is served on. |
 | `--header` | | Header injected into every request forwarded to the target, as `Name: value`. Repeatable. |
+| `--insecure` | | Skip TLS certificate verification for the target, for a dev app behind a self-signed certificate. Also accepted by `swapbook check`. |
 | `--version` | | Print the version and exit. |
 
 ## Headless check (CI)
@@ -23,6 +24,7 @@ fail, so you can gate a build on it without opening the gallery:
 
 ```
 swapbook check --target :8080
+swapbook check --target https://app.localhost --insecure   # self-signed dev cert
 ```
 
 It fetches the manifest, requests each `preview`, and reports one line per

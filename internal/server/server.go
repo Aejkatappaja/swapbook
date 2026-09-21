@@ -9,6 +9,7 @@ package server
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	adapter "github.com/Aejkatappaja/swapbook/adapters/go"
 )
@@ -29,6 +31,9 @@ type Server struct {
 	target *url.URL
 	proxy  *httputil.ReverseProxy
 	ui     UI
+	// client fetches the adapter endpoints directly (not through the proxy),
+	// so it needs the same TLS settings the proxy got.
+	client *http.Client
 }
 
 // UI supplies the static gallery assets and the injected inspector script.
@@ -38,23 +43,51 @@ type UI struct {
 	Assets    map[string][]byte // path (e.g. "app.js") -> bytes
 }
 
+// Options configures how the server talks to the target app.
+type Options struct {
+	// Headers are "Name: value" strings injected into every request forwarded
+	// to the target, so components behind auth render in safe/live mode (e.g. a
+	// session cookie). Malformed entries (no colon) are ignored.
+	Headers []string
+	// Insecure skips TLS certificate verification on the target. For a dev app
+	// behind a self-signed certificate (a local reverse proxy, mkcert, an
+	// internal CA), where the alternative is not previewing it at all. Unlike
+	// Headers, it reaches the overlay's own adapter fetches too: a handshake is
+	// a property of the connection, not of the request.
+	Insecure bool
+}
+
+// Transport returns the round tripper for every request to the target.
+func Transport(insecure bool) http.RoundTripper {
+	// Cloned rather than mutated: http.DefaultTransport is process-global.
+	tr, ok := http.DefaultTransport.(*http.Transport)
+	if ok {
+		tr = tr.Clone()
+	} else {
+		tr = &http.Transport{} // something replaced the default; still honour insecure
+	}
+	if insecure {
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	return tr
+}
+
 // New builds a Server proxying to raw (":8080", "localhost:8080" or a URL).
-// headers are "Name: value" strings injected into every request forwarded to
-// the target, so components behind auth render in safe/live mode (e.g. a
-// session cookie). Malformed entries (no colon) are ignored.
-func New(raw string, ui UI, headers ...string) (*Server, error) {
+func New(raw string, ui UI, opts Options) (*Server, error) {
 	t, err := Normalize(raw)
 	if err != nil {
 		return nil, err
 	}
 	proxy := httputil.NewSingleHostReverseProxy(t)
+	rt := Transport(opts.Insecure)
 	// Inject configured auth headers into every proxied (target-bound) request,
 	// so components behind auth render in safe/live mode. Done at the transport
 	// layer (not the deprecated Director) to leave the proxy's URL/host/path
-	// rewriting untouched. The gallery's own /_swapbook fetches use http.Get,
-	// not this proxy, so they are unaffected.
-	if inject := parseHeaders(headers); len(inject) > 0 {
-		proxy.Transport = &headerInjector{headers: inject, rt: http.DefaultTransport}
+	// rewriting untouched. The gallery's own /_swapbook fetches go through
+	// s.client, not this proxy, so they are unaffected.
+	proxy.Transport = rt
+	if inject := parseHeaders(opts.Headers); len(inject) > 0 {
+		proxy.Transport = &headerInjector{headers: inject, rt: rt}
 	}
 	// Stream responses through instead of buffering, so Server-Sent Events
 	// (text/event-stream) reach the preview live rather than hanging.
@@ -70,7 +103,11 @@ func New(raw string, ui UI, headers ...string) (*Server, error) {
 		resp.Header.Del("Content-Security-Policy-Report-Only")
 		return nil
 	}
-	return &Server{target: t, proxy: proxy, ui: ui}, nil
+	// The adapter endpoints return small documents, so a stalled target should
+	// surface as a 502 rather than hang the overlay. The proxy deliberately has
+	// no timeout: SSE responses never end.
+	client := &http.Client{Transport: rt, Timeout: 15 * time.Second}
+	return &Server{target: t, proxy: proxy, ui: ui, client: client}, nil
 }
 
 type header struct{ name, value string }
@@ -151,7 +188,7 @@ func (s *Server) serveOverlay(w http.ResponseWriter, r *http.Request) {
 // adapterGet fetches an adapter endpoint on the target. sub is the path under
 // MountPath, e.g. "/manifest.json" or "/mock/card/empty/0".
 func (s *Server) adapterGet(sub string) (*http.Response, error) {
-	return http.Get(s.target.String() + adapter.MountPath + sub)
+	return s.client.Get(s.target.String() + adapter.MountPath + sub)
 }
 
 // proxyPass fetches an adapter endpoint and streams it back with contentType.

@@ -273,6 +273,7 @@ app.<span class="fn">use</span>(reg.<span class="fn">router</span>());</code></p
         <tr><td><code>--target</code></td><td><code>:8080</code></td><td>Address of the app to proxy. Accepts <code>:8080</code>, <code>localhost:8080</code> or a full URL.</td></tr>
         <tr><td><code>--port</code></td><td><code>7007</code></td><td>Port the Swapbook UI is served on.</td></tr>
         <tr><td><code>--header</code></td><td></td><td>Header injected into every request to the target, as <code>Name: value</code>. Repeatable, so components behind auth render in live mode.</td></tr>
+        <tr><td><code>--insecure</code></td><td></td><td>Skip TLS certificate verification for the target, for a dev app behind a self-signed certificate (a local reverse proxy, mkcert, an internal CA). Also accepted by <code>swapbook check</code>.</td></tr>
         <tr><td><code>--version</code></td><td></td><td>Print the version and exit.</td></tr>
       </tbody>
     </table>
