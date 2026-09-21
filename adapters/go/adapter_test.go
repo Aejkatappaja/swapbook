@@ -299,3 +299,43 @@ func readBody(t *testing.T, resp *http.Response) string {
 	}
 	return string(b)
 }
+
+// cssSrc / jsSrc carry one path or a list, so an app with split stylesheets
+// declares them without the wire format growing a second field.
+func TestManifestSources(t *testing.T) {
+	decode := func(reg *Registry) manifest {
+		srv := httptest.NewServer(reg.Handler())
+		defer srv.Close()
+		resp, err := http.Get(srv.URL + "/manifest.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var m manifest
+		if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+
+	single := New()
+	single.CSSSrc = "/static/app.css"
+	single.JSSrc = "/static/app.js"
+	if m := decode(single); m.CSSSrc != "/static/app.css" || m.JSSrc != "/static/app.js" {
+		t.Errorf("single: cssSrc = %#v, jsSrc = %#v, want plain strings", m.CSSSrc, m.JSSrc)
+	}
+
+	many := New()
+	many.CSSSrc = "/static/ignored.css" // the plural field wins
+	many.CSSSrcs = []string{"/static/icons.css", "/static/app.css"}
+	many.JSSrcs = []string{"/static/a.js", "/static/b.js"}
+	m := decode(many)
+	css, _ := m.CSSSrc.([]any)
+	js, _ := m.JSSrc.([]any)
+	if len(css) != 2 || css[0] != "/static/icons.css" || css[1] != "/static/app.css" {
+		t.Errorf("cssSrc = %#v, want the list in order", m.CSSSrc)
+	}
+	if len(js) != 2 || js[0] != "/static/a.js" {
+		t.Errorf("jsSrc = %#v, want the list in order", m.JSSrc)
+	}
+}

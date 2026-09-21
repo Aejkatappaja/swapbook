@@ -59,9 +59,13 @@ Emit only metadata here, not rendered HTML:
 
 ```jsonc
 {
-  "htmxSrc": "/static/htmx.min.js", // your app's htmx URL, or "" for the embedded fallback
+  "htmxSrc": "/static/htmx.min.js", // your app's htmx URL, or "" for the embedded fallback (a single path)
   "cssSrc":  "/static/app.css",     // stylesheet injected into bare-fragment previews, or ""
   "jsSrc":   "/static/app.js",      // optional behavior script, or ""
+  // cssSrc and jsSrc each take one path or a list, injected in the order given:
+  //   "cssSrc": ["/static/icons.css", "/static/font.css", "/static/app.css"]
+  // Emitting a plain string for a single file keeps older manifests valid.
+  // htmxSrc does not: a document runs one htmx, and a list there is not read.
   "viewports": [                    // optional named preview widths, added to full/tablet/phone
     { "name": "wide", "w": "1440px" }
   ],
@@ -88,7 +92,7 @@ Content type is `application/json`.
 - **Full page** (response starts with `<!doctype` or `<html>`): served as-is,
   Swapbook only injects its inspector. The page brings its own htmx and CSS.
 - **Bare fragment** (anything else): Swapbook wraps it in a minimal document and
-  injects htmx (`htmxSrc` or its embedded copy), the stylesheet (`cssSrc`) and
+  injects htmx (`htmxSrc` or its embedded copy), the stylesheet(s) (`cssSrc`) and
   the inspector.
 
 If the variant has controls, coerce the query-string values into typed args

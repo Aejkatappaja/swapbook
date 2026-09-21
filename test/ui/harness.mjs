@@ -17,15 +17,20 @@ export function res(status, body) {
  * Boot the UI with a fetch stub, then wait until `ready(window)` is truthy.
  * Returns the jsdom window.
  */
-export async function boot(fetchImpl, ready) {
+export async function boot(fetchImpl, ready, hash = "") {
   const { JSDOM } = await import("jsdom");
   const dom = new JSDOM(HTML, {
     runScripts: "dangerously",
-    url: "http://localhost/__sb/",
+    // a hash selects a story on load, the way a shared deep link does; without
+    // one the chrome renders the sidebar and waits for a click.
+    url: "http://localhost/__sb/" + (hash ? "#" + hash : ""),
     pretendToBeVisual: true,
   });
   const w = dom.window;
   w.fetch = fetchImpl;
+  // jsdom implements no layout, so it has no scrollIntoView; selecting a story
+  // calls it to keep the sidebar in view.
+  w.Element.prototype.scrollIntoView = function () {};
   // app.js starts a 1.5s reconnect poller; skip it so jsdom timers don't keep
   // the test process alive.
   w.setInterval = () => 0;

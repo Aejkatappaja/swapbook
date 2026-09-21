@@ -40,6 +40,16 @@ check($st === 200, 'manifest 200');
 check($ct === 'application/json', 'manifest content-type json');
 $m = json_decode($body, true);
 check(($m['cssSrc'] ?? null) === '/static/ds.css', 'manifest cssSrc');
+
+// cssSrc / jsSrc also take a list, injected in the order given
+$multi = new Swapbook();
+$multi->cssSrc = ['/static/icons.css', '/static/app.css'];
+$multi->jsSrc = ['/static/a.js'];
+$multi->register('Button', [sb_variant('primary', fn($a) => '<button>Save</button>')]);
+[, , $mb] = $multi->handle('GET', '/_swapbook/manifest.json', []);
+$mm = json_decode($mb, true);
+check(($mm['cssSrc'] ?? null) === ['/static/icons.css', '/static/app.css'], 'manifest cssSrc list, in order');
+check(($mm['jsSrc'] ?? null) === ['/static/a.js'], 'manifest jsSrc list');
 check(count($m['stories']) === 2, 'manifest 2 stories');
 check(($m['stories'][0]['id'] ?? null) === 'button', 'story id slugged');
 $ctrl = $m['stories'][0]['variants'][1] ?? [];

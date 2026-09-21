@@ -12,6 +12,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/http/httputil"
@@ -255,12 +256,19 @@ func (s *Server) serveFrame(w http.ResponseWriter, r *http.Request, id string) {
 	if htmxSrc == "" {
 		htmxSrc = "/__sb/htmx.min.js" // embedded fallback
 	}
+	// css and js are repeatable, and injected in the order given: for CSS that
+	// order is the cascade. Escaped because these land in an HTML attribute and
+	// the query string is whatever the browser was pointed at.
 	var css, js string
-	if cssSrc := r.URL.Query().Get("css"); cssSrc != "" {
-		css = fmt.Sprintf(`<link rel="stylesheet" href="%s">`, cssSrc)
+	for _, src := range r.URL.Query()["css"] {
+		if src != "" {
+			css += fmt.Sprintf(`<link rel="stylesheet" href="%s">`, html.EscapeString(src))
+		}
 	}
-	if jsSrc := r.URL.Query().Get("js"); jsSrc != "" {
-		js = fmt.Sprintf(`<script src="%s" defer></script>`, jsSrc)
+	for _, src := range r.URL.Query()["js"] {
+		if src != "" {
+			js += fmt.Sprintf(`<script src="%s" defer></script>`, html.EscapeString(src))
+		}
 	}
 	// canvas background: injected last + !important so it wins over the app's
 	// own CSS, letting you preview a fragment on light/dark/checker.
@@ -276,7 +284,7 @@ func (s *Server) serveFrame(w http.ResponseWriter, r *http.Request, id string) {
 %s
 </head>
 <body>%s</body>
-</html>`, css, htmxSrc, js, head, bgStyle, fragment)
+</html>`, css, html.EscapeString(htmxSrc), js, head, bgStyle, fragment)
 }
 
 // bgValue maps a canvas background name to a CSS background value.

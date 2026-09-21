@@ -216,6 +216,19 @@ app.<span class="fn">use</span>(reg.<span class="fn">router</span>());</code></p
     <h3>Any other stack</h3>
     <p>There is no adapter requirement. Answer the four endpoints under <code>/_swapbook</code> in any language and Swapbook drives it. See the <a href="#protocol">protocol</a> and the stdlib examples in <code>examples/{python,node,ruby}/</code>.</p>
 
+    <h3>Several stylesheets or scripts</h3>
+    <p>If your styles are split across files (an icon set, a font, the app's own CSS), declare them all. They are injected in the order you give, which for CSS is the cascade. The same holds for <code>jsSrc</code>. A single path stays a plain string, so nothing you already wrote changes.</p>
+    <pre><code>reg.CSSSrcs = []<span class="kw">string</span>{<span class="st">"/static/icons.css"</span>, <span class="st">"/static/app.css"</span>}   <span class="c">// Go</span>
+
+reg = <span class="fn">Registry</span>(css_src=[<span class="st">"/static/icons.css"</span>, <span class="st">"/static/app.css"</span>])   <span class="c"># Django / Flask</span>
+
+REG = Swapbook::Registry.<span class="fn">new</span>(css_src: [<span class="st">"/assets/icons.css"</span>, <span class="st">"/assets/app.css"</span>])   <span class="c"># Rails</span>
+
+$sb-&gt;cssSrc = [<span class="st">'/css/icons.css'</span>, <span class="st">'/css/app.css'</span>];   <span class="c">// PHP</span>
+
+<span class="kw">const</span> reg = <span class="kw">new</span> <span class="fn">Registry</span>({ cssSrc: [<span class="st">"/static/icons.css"</span>, <span class="st">"/static/app.css"</span>] });   <span class="c">// Express</span></code></pre>
+    <p>Go is the one adapter with a second field, <code>CSSSrcs</code> / <code>JSSrcs</code>, because its registry is typed; set one or the other, the plural wins. <code>htmxSrc</code> stays a single path: a document runs one htmx.</p>
+
     <h2 id="controls">Controls <span class="k">// live knobs</span></h2>
     <p>A control adds a form input to the toolbar; changing it re-renders the variant. A control has a <code>name</code>, a <code>type</code> (<code>text</code>, <code>number</code>, <code>bool</code>, <code>select</code>), a default, and options for <code>select</code>. In Go, <code>VarC</code> receives typed <code>Args</code>:</p>
     <pre><code>reg.<span class="fn">RegisterIn</span>(<span class="st">"actions"</span>, <span class="st">"Button"</span>,
@@ -329,7 +342,7 @@ docker run --rm -v "$PWD/test/e2e/visual:/work/test/e2e/visual" swapbook-visual 
       <li><b>SSE and WebSocket</b> connections are proxied through and the inspector logs their lifecycle (open, each default message/frame with direction, close). They are observed, not gated: a streamed connection is never mocked or blocked, and named SSE events are not yet surfaced.</li>
       <li><b>Mocks are stateless.</b> You can set a mock's status (200 by default, or a non-2xx like 422/500 to exercise error swaps), but it returns the same response on every call, so stateful multi-step flows are out of scope.</li>
       <li><b>Auth is global.</b> <code>--header</code> injects the same credential into every request forwarded to the target, so a session runs as one identity (no per-story auth). Use a throwaway dev session, never a production token.</li>
-      <li><b>CSS.</b> Bare-fragment previews load your app's <code>cssSrc</code>. If your styles are code-split or purged per route, point <code>cssSrc</code> at the full stylesheet.</li>
+      <li><b>CSS.</b> Bare-fragment previews load your app's <code>cssSrc</code>, which takes one path or a list of them in cascade order. If your styles are code-split or purged per route, declare every file or point <code>cssSrc</code> at the full stylesheet.</li>
       <li><b>TLS targets.</b> An app behind a certificate nothing trusts (a local reverse proxy, <code>mkcert</code>, a company CA) fails the handshake. Pass <code>--insecure</code> to skip verification, with the scheme on the target (<code>https://app.localhost</code>), since a schemeless target is treated as <code>http://</code> where the flag does nothing.</li>
     </ul>
     <div class="note">Swapbook strips security headers and proxies your app, so it is a local dev tool only. <b>Never run it in production or expose it publicly.</b></div>

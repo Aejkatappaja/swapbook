@@ -42,8 +42,10 @@ class Swapbook
     private array $stories = [];
     private array $globalMocks = [];
     public string $htmxSrc = '';
-    public string $cssSrc = '';
-    public string $jsSrc = '';
+    /** @var string|string[] one stylesheet path, or several in load order */
+    public string|array $cssSrc = '';
+    /** @var string|string[] one script path, or several in load order */
+    public string|array $jsSrc = '';
     /** @var array<array{name:string,w:string}> named preview widths */
     public array $viewports = [];
 

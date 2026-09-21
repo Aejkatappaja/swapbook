@@ -352,9 +352,10 @@ Swapbook is early and deliberately scoped. Known edges:
   forwarded to the target, so a session runs as one identity; there is no
   per-story auth. Use a throwaway dev session (it lands in your shell history),
   never a production token.
-- **CSS.** Bare-fragment previews load your app's declared `cssSrc`. If your
-  styles are code-split or purged per route, point `cssSrc` at the full
-  stylesheet so previews match the app. Full-page components bring their own.
+- **CSS.** Bare-fragment previews load your app's declared `cssSrc`, which takes
+  one path or a list of them in cascade order. If your styles are code-split or
+  purged per route, declare every file or point `cssSrc` at the full stylesheet,
+  so previews match the app. Full-page components bring their own.
 - **Relative asset paths** inside a bare fragment may not resolve; prefer
   app-absolute paths like `/static/...`.
 - **TLS targets.** An app behind a certificate nothing trusts (a local reverse
