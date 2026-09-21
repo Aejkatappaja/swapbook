@@ -4,7 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-09-22
+
+### Added
+
+- **Several stylesheets and scripts per manifest.** `cssSrc` and `jsSrc` now take
+  one path or a list of them, injected into bare-fragment previews in the order
+  given, since for CSS that order is the cascade. An app whose styles are split
+  across an icon set, a font and its own CSS can declare all three. A single path
+  stays a plain string, so existing manifests and adapters are unaffected; the Go
+  adapter, being typed, gains `CSSSrcs` / `JSSrcs` beside the singular fields.
 
 ### Changed
 
@@ -18,15 +27,6 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   phone, and the binary says so on startup when you pass it. Every adapter
   already documents `cssSrc` / `jsSrc` / `htmxSrc` as app-relative, so a
   declared path keeps working.
-
-### Added
-
-- **Several stylesheets and scripts per manifest.** `cssSrc` and `jsSrc` now take
-  one path or a list of them, injected into bare-fragment previews in the order
-  given, since for CSS that order is the cascade. An app whose styles are split
-  across an icon set, a font and its own CSS can declare all three. A single path
-  stays a plain string, so existing manifests and adapters are unaffected; the Go
-  adapter, being typed, gains `CSSSrcs` / `JSSrcs` beside the singular fields.
 
 ## [0.7.0] - 2026-09-21
 
@@ -155,6 +155,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   inspector, mock / safe / live modes, live controls, a11y lint, adapters for
   Go/templ, Django, Rails and Laravel, and install via curl / npx / go install.
 
+[0.8.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Aejkatappaja/swapbook/releases/tag/v0.5.0
