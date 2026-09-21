@@ -66,6 +66,7 @@ func main() {
 	target := flag.String("target", ":8080", "target app address (host:port or URL)")
 	port := flag.String("port", "7007", "port to serve the Swapbook UI on")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	insecure := flag.Bool("insecure", false, "skip TLS certificate verification for the target, for a dev app behind a self-signed certificate")
 	var headers headerFlags
 	flag.Var(&headers, "header", "header injected into every request to the target, e.g. --header 'Cookie: session=...' (repeatable) so components behind auth render in live mode")
 	flag.Parse()
@@ -79,7 +80,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load ui: %v", err)
 	}
-	srv, err := server.New(*target, ui, headers...)
+	srv, err := server.New(*target, ui, server.Options{Headers: headers, Insecure: *insecure})
 	if err != nil {
 		log.Fatalf("bad target: %v", err)
 	}
@@ -90,7 +91,25 @@ func main() {
 	if len(headers) > 0 {
 		fmt.Printf("auth      injecting %d header(s) into target requests (live/safe mode)\n", len(headers))
 	}
+	if note := tlsNote(*target, *insecure); note != "" {
+		fmt.Println(note)
+	}
 	log.Fatal(http.ListenAndServe(addr, srv.Handler()))
+}
+
+// tlsNote reports what --insecure actually did, or "" when there is nothing to
+// say. Normalize defaults a schemeless target to http, where skipping
+// certificate verification is a no-op: saying it was disabled would confirm a
+// mental model that is about to cost the user a confusing failure.
+func tlsNote(target string, insecure bool) string {
+	if !insecure {
+		return ""
+	}
+	u, err := server.Normalize(target)
+	if err != nil || u.Scheme == "https" {
+		return "tls       certificate verification disabled for the target"
+	}
+	return "tls       --insecure ignored: " + u.String() + " is not https"
 }
 
 // runCheck handles `swapbook check`: a headless render smoke over every story,
@@ -98,8 +117,12 @@ func main() {
 func runCheck(args []string) {
 	fs := flag.NewFlagSet("check", flag.ExitOnError)
 	target := fs.String("target", ":8080", "target app address (host:port or URL)")
+	insecure := fs.Bool("insecure", false, "skip TLS certificate verification for the target")
 	fs.Parse(args)
-	failed, err := check.Run(*target, os.Stdout)
+	if note := tlsNote(*target, *insecure); note != "" {
+		fmt.Println(note)
+	}
+	failed, err := check.Run(*target, *insecure, os.Stdout)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "swapbook check:", err)
 		os.Exit(1)

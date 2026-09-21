@@ -13,6 +13,10 @@ import (
 // fakeTarget stands in for an app running the adapter, plus a normal app route
 // that the reverse proxy must pass through.
 func fakeTarget() *httptest.Server {
+	return httptest.NewServer(targetMux())
+}
+
+func targetMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc(adapter.MountPath+"/manifest.json", func(w http.ResponseWriter, _ *http.Request) {
 		io.WriteString(w, `{"htmxSrc":"/static/htmx.min.js","stories":[]}`)
@@ -40,7 +44,7 @@ func fakeTarget() *httptest.Server {
 		w.WriteHeader(422)
 		io.WriteString(w, `<div>INVALID</div>`)
 	})
-	return httptest.NewServer(mux)
+	return mux
 }
 
 func testUI() UI {
@@ -54,7 +58,7 @@ func testUI() UI {
 func TestOverlayRoutes(t *testing.T) {
 	target := fakeTarget()
 	defer target.Close()
-	srv, err := New(target.URL, testUI())
+	srv, err := New(target.URL, testUI(), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +93,7 @@ func TestOverlayRoutes(t *testing.T) {
 func TestHeaderInjection(t *testing.T) {
 	target := fakeTarget()
 	defer target.Close()
-	srv, err := New(target.URL, testUI(), "Cookie: session=abc", "X-User: ada", "malformed-no-colon")
+	srv, err := New(target.URL, testUI(), Options{Headers: []string{"Cookie: session=abc", "X-User: ada", "malformed-no-colon"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +106,7 @@ func TestHeaderInjection(t *testing.T) {
 	}
 
 	// with no headers configured, nothing is added
-	plain, _ := New(target.URL, testUI())
+	plain, _ := New(target.URL, testUI(), Options{})
 	pts := httptest.NewServer(plain.Handler())
 	defer pts.Close()
 	if got := body(t, pts.URL+"/app/whoami"); got != "|" {
@@ -146,7 +150,7 @@ func TestFramePreservesFullDocument(t *testing.T) {
 func TestFrameModeConfig(t *testing.T) {
 	target := fakeTarget()
 	defer target.Close()
-	srv, _ := New(target.URL, testUI())
+	srv, _ := New(target.URL, testUI(), Options{})
 	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()
 
@@ -165,7 +169,7 @@ func TestFrameModeConfig(t *testing.T) {
 func TestMockWiring(t *testing.T) {
 	target := fakeTarget()
 	defer target.Close()
-	srv, _ := New(target.URL, testUI())
+	srv, _ := New(target.URL, testUI(), Options{})
 	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()
 
@@ -195,7 +199,7 @@ func TestMockWiring(t *testing.T) {
 func TestStripsFramingHeaders(t *testing.T) {
 	target := fakeTarget()
 	defer target.Close()
-	srv, _ := New(target.URL, testUI())
+	srv, _ := New(target.URL, testUI(), Options{})
 	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()
 
@@ -238,4 +242,48 @@ func body(t *testing.T, url string) string {
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 	return string(b)
+}
+
+// Both paths to the target have to honour --insecure: the reverse proxy, and
+// the direct client the overlay uses for the adapter endpoints.
+func TestInsecureTarget(t *testing.T) {
+	target := httptest.NewTLSServer(targetMux())
+	defer target.Close()
+
+	// verification on: nothing reaches the target
+	strict, err := New(target.URL, testUI(), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sts := httptest.NewServer(strict.Handler())
+	defer sts.Close()
+	for _, path := range []string{"/app/workouts/entry-row", Overlay + "/api/manifest"} {
+		resp, err := http.Get(sts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadGateway {
+			t.Errorf("%s = %d, want 502", path, resp.StatusCode)
+		}
+	}
+
+	// --insecure: both paths go through. Passing headers as well covers the
+	// composition: the injector has to wrap the same transport, not the default
+	// one, and swapping it back passes every other test in this file.
+	srv, err := New(target.URL, testUI(), Options{
+		Headers:  []string{"Cookie: session=abc", "X-User: ada"},
+		Insecure: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+	if got := body(t, ts.URL+"/app/whoami"); got != "session=abc|ada" {
+		t.Errorf("proxied request over TLS = %q, want %q", got, "session=abc|ada")
+	}
+	if got := body(t, ts.URL+Overlay+"/api/manifest"); !strings.Contains(got, `"htmxSrc"`) {
+		t.Errorf("overlay manifest over TLS = %q", got)
+	}
 }

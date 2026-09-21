@@ -13,6 +13,10 @@ import (
 // fakeTarget serves a manifest with three variants: one renders, one 500s, one
 // returns an empty body.
 func fakeTarget() *httptest.Server {
+	return httptest.NewServer(targetMux())
+}
+
+func targetMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc(adapter.MountPath+"/manifest.json", func(w http.ResponseWriter, _ *http.Request) {
 		io.WriteString(w, `{"stories":[{"id":"card","name":"Card","variants":[{"name":"ok"},{"name":"boom"},{"name":"blank"}]}]}`)
@@ -24,7 +28,7 @@ func fakeTarget() *httptest.Server {
 		http.Error(w, "render: boom", http.StatusInternalServerError)
 	})
 	mux.HandleFunc(adapter.MountPath+"/preview/card/blank", func(w http.ResponseWriter, _ *http.Request) {})
-	return httptest.NewServer(mux)
+	return mux
 }
 
 func TestRunReportsFailures(t *testing.T) {
@@ -32,7 +36,7 @@ func TestRunReportsFailures(t *testing.T) {
 	defer ts.Close()
 
 	var out strings.Builder
-	failed, err := Run(ts.URL, &out)
+	failed, err := Run(ts.URL, false, &out)
 	if err != nil {
 		t.Fatalf("unexpected setup error: %v", err)
 	}
@@ -51,13 +55,25 @@ func TestRunNoAdapter(t *testing.T) {
 	// a bare server with nothing mounted under /_swapbook -> manifest 404
 	ts := httptest.NewServer(http.NotFoundHandler())
 	defer ts.Close()
-	if _, err := Run(ts.URL, io.Discard); err == nil {
+	if _, err := Run(ts.URL, false, io.Discard); err == nil {
 		t.Fatal("expected an error when no adapter is mounted")
 	}
 }
 
 func TestRunUnreachable(t *testing.T) {
-	if _, err := Run("http://127.0.0.1:1", io.Discard); err == nil {
+	if _, err := Run("http://127.0.0.1:1", false, io.Discard); err == nil {
 		t.Fatal("expected an error for an unreachable target")
+	}
+}
+
+func TestRunInsecureTarget(t *testing.T) {
+	ts := httptest.NewTLSServer(targetMux())
+	defer ts.Close()
+
+	if _, err := Run(ts.URL, false, io.Discard); err == nil {
+		t.Fatal("expected a TLS verification error without --insecure")
+	}
+	if _, err := Run(ts.URL, true, io.Discard); err != nil {
+		t.Fatalf("unexpected error with --insecure: %v", err)
 	}
 }

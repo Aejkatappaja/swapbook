@@ -31,14 +31,15 @@ type manifest struct {
 // Run smoke-checks every story/variant preview on the target (":8080",
 // "localhost:8080" or a URL), writing a per-story report to out. It returns the
 // number of failures; a non-nil error is a setup failure (unreachable target,
-// no adapter, malformed manifest) and should also fail the build.
-func Run(target string, out io.Writer) (int, error) {
+// no adapter, malformed manifest) and should also fail the build. insecure
+// skips TLS verification, for a target behind a self-signed certificate.
+func Run(target string, insecure bool, out io.Writer) (int, error) {
 	base, err := server.Normalize(target)
 	if err != nil {
 		return 0, fmt.Errorf("bad target %q: %w", target, err)
 	}
 	root := base.String() + adapter.MountPath
-	cli := &http.Client{Timeout: 15 * time.Second}
+	cli := &http.Client{Timeout: 15 * time.Second, Transport: server.Transport(insecure)}
 
 	resp, err := cli.Get(root + "/manifest.json")
 	if err != nil {
