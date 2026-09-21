@@ -13,6 +13,7 @@ swapbook [flags]
 | --- | --- | --- |
 | `--target` | `:8080` | Address of the running app to proxy. Accepts `:8080`, `localhost:8080` or a full URL like `http://127.0.0.1:3000`. |
 | `--port` | `7007` | Port the Swapbook UI is served on. |
+| `--host` | `127.0.0.1` | Address to listen on. The workbench stays on your machine by default; pass `0.0.0.0` to reach it from another device. |
 | `--header` | | Header injected into every request forwarded to the target, as `Name: value`. Repeatable. |
 | `--insecure` | | Skip TLS certificate verification for the target, for a dev app behind a self-signed certificate. Also accepted by `swapbook check`. |
 | `--version` | | Print the version and exit. |
@@ -58,6 +59,26 @@ The gallery's own `/_swapbook` calls are not proxied, so they are unaffected;
 only requests to your app carry the header. Because the value is a real
 credential and appears in your shell history and process list, use a throwaway
 dev session and never a production token. This is a local dev tool only.
+
+## Reaching the workbench from another device
+
+Swapbook listens on `127.0.0.1` only, so the workbench is not reachable from
+your network. That default is deliberate: it proxies your app, strips the
+framing headers off its responses, and forwards whatever `--header` credential
+you gave it, so anyone who can open it can drive your app as you.
+
+To preview on a phone or from a VM, open it explicitly:
+
+```
+swapbook --target :8080 --host 0.0.0.0
+```
+
+It says so on startup when you do. Only worth it on a network you trust.
+
+Either way, a preview frame loads stylesheets and scripts only from paths on
+your app. `cssSrc`, `jsSrc` and `htmxSrc` pointing somewhere absolute are
+ignored, because the frame runs on Swapbook's origin next to the proxy that
+carries your credentials.
 
 ## Targets behind a self-signed certificate
 

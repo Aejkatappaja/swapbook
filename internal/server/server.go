@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -207,6 +208,40 @@ func (s *Server) proxyPass(w http.ResponseWriter, sub, contentType string) {
 	io.Copy(w, resp.Body)
 }
 
+// keep is appRelative plus a line in the terminal when a source is dropped.
+// Otherwise a manifest pointing at a CDN renders an unstyled preview and the
+// only trace is a paragraph in the docs.
+func keep(src, field string) bool {
+	if src == "" {
+		return false
+	}
+	if !appRelative(src) {
+		log.Printf("%s %q ignored: previews load app paths only (e.g. /static/app.css)", field, src)
+		return false
+	}
+	return true
+}
+
+// appRelative reports whether src is a path on the target app, which is the
+// only thing the frame will load. An absolute or protocol-relative URL is not:
+// the frame runs on Swapbook's origin, which proxies the target and forwards
+// any --header credential, so a script pulled in from elsewhere runs as you.
+// Every adapter documents these fields as app-relative anyway.
+//
+// A prefix test alone is not enough. A browser strips tab, LF and CR and reads
+// "\" as "/" before resolving a URL, so `/\evil.example/x.js` and
+// `/<tab>/evil.example/x.js` both look app-relative here and land on a remote
+// origin there. Hence the control-character screen, then a real parse.
+func appRelative(src string) bool {
+	if strings.ContainsRune(src, '\\') || strings.ContainsFunc(src, func(r rune) bool {
+		return r < 0x20 || r == 0x7f
+	}) {
+		return false
+	}
+	u, err := url.Parse(src)
+	return err == nil && u.Scheme == "" && u.Host == "" && strings.HasPrefix(u.Path, "/")
+}
+
 // serveFrame fetches a preview fragment and wraps it in a full HTML document
 // with htmx and the inspector script injected. id is "{story}/{variant}".
 func (s *Server) serveFrame(w http.ResponseWriter, r *http.Request, id string) {
@@ -253,7 +288,7 @@ func (s *Server) serveFrame(w http.ResponseWriter, r *http.Request, id string) {
 	// Bare fragment: wrap in a minimal document and inject htmx, the app CSS
 	// (so it renders styled) and the config + inspector.
 	htmxSrc := r.URL.Query().Get("htmx")
-	if htmxSrc == "" {
+	if !keep(htmxSrc, "htmxSrc") {
 		htmxSrc = "/__sb/htmx.min.js" // embedded fallback
 	}
 	// css and js are repeatable, and injected in the order given: for CSS that
@@ -261,12 +296,12 @@ func (s *Server) serveFrame(w http.ResponseWriter, r *http.Request, id string) {
 	// the query string is whatever the browser was pointed at.
 	var css, js string
 	for _, src := range r.URL.Query()["css"] {
-		if src != "" {
+		if keep(src, "cssSrc") {
 			css += fmt.Sprintf(`<link rel="stylesheet" href="%s">`, html.EscapeString(src))
 		}
 	}
 	for _, src := range r.URL.Query()["js"] {
-		if src != "" {
+		if keep(src, "jsSrc") {
 			js += fmt.Sprintf(`<script src="%s" defer></script>`, html.EscapeString(src))
 		}
 	}

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -65,6 +66,7 @@ func main() {
 
 	target := flag.String("target", ":8080", "target app address (host:port or URL)")
 	port := flag.String("port", "7007", "port to serve the Swapbook UI on")
+	host := flag.String("host", "127.0.0.1", "address to listen on; pass 0.0.0.0 to reach the workbench from another device")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	insecure := flag.Bool("insecure", false, "skip TLS certificate verification for the target, for a dev app behind a self-signed certificate")
 	var headers headerFlags
@@ -85,16 +87,53 @@ func main() {
 		log.Fatalf("bad target: %v", err)
 	}
 
-	addr := ":" + *port
+	addr := net.JoinHostPort(strings.Trim(*host, "[]"), *port)
 	fmt.Printf("swapbook → target %s\n", *target)
-	fmt.Printf("open      http://localhost:%s%s/\n", *port, server.Overlay)
+	fmt.Printf("open      http://%s%s/\n", openHost(*host, *port), server.Overlay)
 	if len(headers) > 0 {
 		fmt.Printf("auth      injecting %d header(s) into target requests (live/safe mode)\n", len(headers))
 	}
 	if note := tlsNote(*target, *insecure); note != "" {
 		fmt.Println(note)
 	}
+	if note := hostNote(*host, addr); note != "" {
+		fmt.Println(note)
+	}
 	log.Fatal(http.ListenAndServe(addr, srv.Handler()))
+}
+
+// openHost is the authority to print for the browser. A bind to one interface
+// is only reachable at that address, so printing localhost there would hand the
+// user a URL their browser refuses.
+func openHost(host, port string) string {
+	if loopback(host) || host == "" || host == "0.0.0.0" || host == "::" {
+		return "localhost:" + port
+	}
+	return net.JoinHostPort(strings.Trim(host, "[]"), port)
+}
+
+// hostNote says so when the workbench is listening beyond this machine, and
+// returns "" when it is not. Worth saying out loud: it strips the target's
+// framing headers and forwards any --header credential, so who can reach it is
+// not a detail.
+func hostNote(host, addr string) string {
+	if loopback(host) {
+		return ""
+	}
+	return "host      listening on " + addr + ", reachable from your network"
+}
+
+// loopback reports whether host keeps the workbench on this machine. ParseIP
+// covers 127.0.0.0/8 and ::1; the name and the bracketed IPv6 form have to be
+// handled here, and both are plausible things to type at a tool that prints a
+// localhost URL on startup.
+func loopback(host string) bool {
+	host = strings.Trim(host, "[]")
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // tlsNote reports what --insecure actually did, or "" when there is nothing to

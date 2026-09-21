@@ -6,6 +6,19 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **The workbench is tighter by default.** It listens on `127.0.0.1` where it
+  listened on every interface before, and the preview frame now loads
+  stylesheets and scripts only from paths on your app, not from an absolute or
+  protocol-relative URL. Both close the same hole from two sides: the frame runs
+  on Swapbook's origin, next to a proxy that strips your app's framing headers
+  and forwards any `--header` credential, so a script loaded there runs as you.
+  `--host 0.0.0.0` restores the old bind, which is what you want to preview on a
+  phone, and the binary says so on startup when you pass it. Every adapter
+  already documents `cssSrc` / `jsSrc` / `htmxSrc` as app-relative, so a
+  declared path keeps working.
+
 ### Added
 
 - **Several stylesheets and scripts per manifest.** `cssSrc` and `jsSrc` now take

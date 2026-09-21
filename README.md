@@ -364,7 +364,9 @@ Swapbook is early and deliberately scoped. Known edges:
   schemeless target is treated as `http://` where the flag does nothing.
 
 Swapbook strips security headers and proxies your app, so it is a local
-development tool only. Never run it in production or expose it publicly.
+development tool only. It listens on `127.0.0.1` for that reason; `--host
+0.0.0.0` opens it to your network, which is what you want to preview on a phone
+and nothing else. Never run it in production or expose it publicly.
 
 ## License
 

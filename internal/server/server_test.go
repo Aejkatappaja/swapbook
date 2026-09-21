@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -338,5 +339,45 @@ func TestFrameEscapesSources(t *testing.T) {
 	// a query string on an asset path is still usable after escaping
 	if got := body(t, ts.URL+Overlay+"/frame/card/empty?css=%2Fapp.css%3Fv%3D2"); !strings.Contains(got, "/app.css?v=2") {
 		t.Errorf("versioned asset path mangled: %q", got)
+	}
+}
+
+// The frame runs on Swapbook's origin, next to a proxy that forwards the
+// --header credential, so it loads paths on the target app and nothing else.
+// Anyone can point a browser at this URL, including a page the developer is
+// merely visiting, so loopback is no defence here.
+func TestFrameRejectsRemoteSources(t *testing.T) {
+	target := fakeTarget()
+	defer target.Close()
+	srv, _ := New(target.URL, testUI(), Options{})
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	for _, src := range []string{
+		"https://evil.example/x.js",
+		"//evil.example/x.js", // protocol-relative
+		"http://evil.example/x.css",
+		"javascript:alert(1)",
+		// These read as app-relative to a prefix test, and as a remote origin
+		// to a browser: it reads "\\" as "/" and strips tab, LF and CR before
+		// resolving. A prefix test alone passed all four.
+		`/\evil.example/x.js`,
+		"/\t/evil.example/x.js",
+		"/\n/evil.example/x.js",
+		"/\r/evil.example/x.js",
+	} {
+		frame := body(t, ts.URL+Overlay+"/frame/card/empty?css="+url.QueryEscape(src)+"&js="+url.QueryEscape(src))
+		if strings.Contains(frame, "evil.example") || strings.Contains(frame, "javascript:") {
+			t.Errorf("%q reached the frame:\n%s", src, frame)
+		}
+	}
+
+	// an app path is still injected, and a remote htmx falls back to the embedded copy
+	frame := body(t, ts.URL+Overlay+"/frame/card/empty?css=/app.css&htmx=https%3A%2F%2Fevil.example%2Fhtmx.js")
+	if !strings.Contains(frame, `href="/app.css"`) {
+		t.Error("an app-relative stylesheet was dropped")
+	}
+	if !strings.Contains(frame, `src="/__sb/htmx.min.js"`) {
+		t.Errorf("remote htmx did not fall back to the embedded copy:\n%s", frame)
 	}
 }
