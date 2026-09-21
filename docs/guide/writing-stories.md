@@ -101,6 +101,36 @@ in any language and Swapbook drives it. See the
 [protocol spec](../../SPEC.md) and the stdlib examples in
 `examples/{python,node,ruby}/`.
 
+## Several stylesheets or scripts
+
+If your styles are split across files (an icon set, a font, the app's own CSS),
+declare them all. They are injected in the order you give, which for CSS is the
+cascade. The same holds for `jsSrc`.
+
+```go
+reg.CSSSrcs = []string{"/static/icons.css", "/static/font.css", "/static/app.css"}
+```
+
+```python
+reg = Registry(css_src=["/static/icons.css", "/static/font.css", "/static/app.css"])
+```
+
+```ruby
+REG = Swapbook::Registry.new(css_src: ["/assets/icons.css", "/assets/app.css"])
+```
+
+```php
+$sb->cssSrc = ['/css/icons.css', '/css/app.css'];
+```
+
+```js
+const reg = new Registry({ cssSrc: ["/static/icons.css", "/static/app.css"] });
+```
+
+A single path stays a plain string everywhere, so nothing you already wrote
+changes. Go is the one adapter with a second field, `CSSSrcs` / `JSSrcs`,
+because its registry is typed; set one or the other, the plural wins.
+
 ## Full-page vs fragment previews
 
 - A **bare fragment** (the common case) is wrapped by Swapbook in a minimal

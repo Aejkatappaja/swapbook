@@ -10,7 +10,8 @@
  * @typedef {string | VariantObj} Variant  variants may be a bare name (hand-rolled targets) or an object
  * @typedef {{ id: string, name: string, group?: string, docs?: string, variants: Variant[] }} Story
  * @typedef {{ name: string, w: string }} Viewport  a project-declared preview width
- * @typedef {{ htmxSrc?: string, cssSrc?: string, jsSrc?: string, stories?: Story[], viewports?: Viewport[] }} Manifest
+ * @typedef {string | string[]} Srcs one asset path, or several in load order
+ * @typedef {{ htmxSrc?: string, cssSrc?: Srcs, jsSrc?: Srcs, stories?: Story[], viewports?: Viewport[] }} Manifest
  * @typedef {{ source: string, seq?: number, event: string, data?: any }} SBMessage  posted by the frame's inspector
  */
 
@@ -33,7 +34,9 @@ const MODE_TITLES = {
 
 const BGS = ["light", "dark", "checker"]; // actual colors live server-side in bgValue
 
-let htmxSrc = "", cssSrc = "", jsSrc = "";
+let htmxSrc = "";
+/** @type {string[]} */ let cssSrcs = [];
+/** @type {string[]} */ let jsSrcs = [];
 let mode = "mock";
 let widthLabel = "full";
 let bg = localStorage.getItem("swapbook:bg") || "dark";
@@ -69,9 +72,9 @@ const el = (id) => document.getElementById(id);
 function applyManifest(text) {
   manifestRaw = text;
   const m = JSON.parse(text);
-  htmxSrc = m.htmxSrc || "";
-  cssSrc = m.cssSrc || "";
-  jsSrc = m.jsSrc || "";
+  htmxSrc = srcList(m.htmxSrc)[0] || ""; // a document runs one htmx, so take the first
+  cssSrcs = srcList(m.cssSrc);
+  jsSrcs = srcList(m.jsSrc);
   allStories = m.stories || [];
   allWidths = WIDTHS.slice();
   if (Array.isArray(m.viewports)) {
@@ -318,11 +321,18 @@ function set(name, value) {
   writeState();
 }
 
+// cssSrc / jsSrc are one path or a list of them. Normalize so the rest of the
+// chrome only ever deals with a list.
+/** @param {Srcs | undefined} v */
+function srcList(v) {
+  return (Array.isArray(v) ? v : [v]).filter(Boolean);
+}
+
 function frameUrlFor(storyId, variantName, a) {
   const q = new URLSearchParams({ mode });
   if (htmxSrc) q.set("htmx", htmxSrc);
-  if (cssSrc) q.set("css", cssSrc);
-  if (jsSrc) q.set("js", jsSrc);
+  for (const src of cssSrcs) q.append("css", src);
+  for (const src of jsSrcs) q.append("js", src);
   q.set("bg", bg);
   // control args are "arg."-namespaced so the server splits them from frame
   // params by prefix (a control may safely be named "mode"/"bg"/etc.)

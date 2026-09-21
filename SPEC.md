@@ -39,7 +39,11 @@ Returns the gallery contents and asset hints.
 ```jsonc
 {
   "htmxSrc": "/static/htmx.min.js",  // app-relative htmx URL, or "" to use Swapbook's embedded htmx
+                                     // a single path: a document runs one htmx
   "cssSrc":  "/static/app.css",      // app-relative stylesheet injected into bare-fragment previews, or ""
+                                     // a list is also accepted, injected in the order given: ["/icons.css", "/app.css"]
+  "jsSrc":   "/static/app.js",       // optional behavior script, injected deferred, or ""
+                                     // takes a list too, same as cssSrc
   "viewports": [                     // optional named preview widths, added to the built-in full/tablet/phone
     { "name": "wide", "w": "1440px" }
   ],
@@ -85,8 +89,8 @@ accepted and auto-detected by Swapbook:
   its inspector before `</head>` and serves it as-is (the page brings its own
   htmx and CSS).
 - **Bare fragment**, anything else. Swapbook wraps it in a minimal document and
-  injects htmx (`htmxSrc` or its embedded copy), the stylesheet (`cssSrc`), and
-  the inspector.
+  injects htmx (`htmxSrc` or its embedded copy), the stylesheet or stylesheets
+  (`cssSrc`), and the inspector.
 
 ### 3. Mocks list (optional)
 

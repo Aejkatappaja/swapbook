@@ -13,15 +13,19 @@ test("every variant matches its visual baseline", async ({ page, request }) => {
   // Frame params the chrome normally passes, so the preview renders styled (the
   // app's CSS/JS) instead of bare markup. Fixed bg keeps the canvas deterministic.
   const base = { mode: "mock", bg: "light" };
-  if (manifest.cssSrc) base.css = manifest.cssSrc;
   if (manifest.htmxSrc) base.htmx = manifest.htmxSrc;
-  if (manifest.jsSrc) base.js = manifest.jsSrc;
+  // cssSrc / jsSrc are one path or a list, and the frame takes the param once
+  // per file, so they are appended per variant rather than folded into base.
+  const cssList = [manifest.cssSrc ?? []].flat().filter(Boolean);
+  const jsList = [manifest.jsSrc ?? []].flat().filter(Boolean);
 
   for (const s of manifest.stories || []) {
     if (EXCLUDE.has(s.id)) continue;
     for (const v of s.variants || []) {
       const name = typeof v === "string" ? v : v.name;
       const q = new URLSearchParams({ ...base });
+      for (const src of cssList) q.append("css", src);
+      for (const src of jsList) q.append("js", src);
       await page.goto(`/__sb/frame/${s.id}/${encodeURIComponent(name)}?${q}`);
       await page.waitForLoadState("networkidle");
       await expect.soft(page).toHaveScreenshot(`${s.id}-${name}.png`, { fullPage: true });

@@ -287,3 +287,56 @@ func TestInsecureTarget(t *testing.T) {
 		t.Errorf("overlay manifest over TLS = %q", got)
 	}
 }
+
+// An app whose styles are split across files declares them all, and the frame
+// has to inject every one, in the order given: for CSS that is the cascade.
+func TestFrameInjectsEverySource(t *testing.T) {
+	target := fakeTarget()
+	defer target.Close()
+	srv, err := New(target.URL, testUI(), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	frame := body(t, ts.URL+Overlay+"/frame/card/empty?css=/icons.css&css=/font.css&css=/app.css&js=/a.js&js=/b.js")
+	for _, want := range []string{
+		`<link rel="stylesheet" href="/icons.css">`,
+		`<link rel="stylesheet" href="/font.css">`,
+		`<link rel="stylesheet" href="/app.css">`,
+		`<script src="/a.js" defer></script>`,
+		`<script src="/b.js" defer></script>`,
+	} {
+		if !strings.Contains(frame, want) {
+			t.Errorf("frame missing %q", want)
+		}
+	}
+	if i, j := strings.Index(frame, "/icons.css"), strings.Index(frame, "/app.css"); i > j {
+		t.Error("stylesheets injected out of declaration order")
+	}
+
+	// a single source still works
+	if one := body(t, ts.URL+Overlay+"/frame/card/empty?css=/app.css"); !strings.Contains(one, `href="/app.css"`) {
+		t.Errorf("single source frame = %q", one)
+	}
+}
+
+// The frame's asset paths come off the query string, so they are escaped before
+// landing in an href/src attribute rather than trusted to close it politely.
+func TestFrameEscapesSources(t *testing.T) {
+	target := fakeTarget()
+	defer target.Close()
+	srv, _ := New(target.URL, testUI(), Options{})
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	frame := body(t, ts.URL+Overlay+`/frame/card/empty?css=%2Fa.css%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E`)
+	if strings.Contains(frame, "<script>alert(1)</script>") {
+		t.Errorf("a css path broke out of its attribute:\n%s", frame)
+	}
+	// a query string on an asset path is still usable after escaping
+	if got := body(t, ts.URL+Overlay+"/frame/card/empty?css=%2Fapp.css%3Fv%3D2"); !strings.Contains(got, "/app.css?v=2") {
+		t.Errorf("versioned asset path mangled: %q", got)
+	}
+}

@@ -220,11 +220,20 @@ type Registry struct {
 	// CSSSrc is the app-relative path to the app stylesheet (e.g.
 	// "/static/app.css"). Swapbook injects it into bare-fragment previews so
 	// they render with the real app styles instead of unstyled markup.
+	// For several stylesheets, use CSSSrcs instead.
 	CSSSrc string
+	// CSSSrcs is CSSSrc for an app whose styles are split across files (icons,
+	// a font, the app's own CSS), injected in the order given since that order
+	// is the cascade. When set it replaces CSSSrc.
+	CSSSrcs []string
 	// JSSrc is the app-relative path to the app behavior script (e.g.
 	// "/static/app.js"). Swapbook injects it (deferred) into bare-fragment
 	// previews so client-side behavior (typeaheads, delegated handlers) works.
+	// For several scripts, use JSSrcs instead.
 	JSSrc string
+	// JSSrcs is JSSrc for several scripts, injected in the order given. When
+	// set it replaces JSSrc.
+	JSSrcs []string
 	// Viewports are named preview widths the UI offers on top of its built-in
 	// full/tablet/phone. Optional.
 	Viewports []Viewport
