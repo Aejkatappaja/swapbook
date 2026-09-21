@@ -285,11 +285,13 @@ $sb-&gt;cssSrc = [<span class="st">'/css/icons.css'</span>, <span class="st">'/c
       <tbody>
         <tr><td><code>--target</code></td><td><code>:8080</code></td><td>Address of the app to proxy. Accepts <code>:8080</code>, <code>localhost:8080</code> or a full URL.</td></tr>
         <tr><td><code>--port</code></td><td><code>7007</code></td><td>Port the Swapbook UI is served on.</td></tr>
+        <tr><td><code>--host</code></td><td><code>127.0.0.1</code></td><td>Address to listen on. The workbench stays on your machine by default; pass <code>0.0.0.0</code> to reach it from a phone or a VM.</td></tr>
         <tr><td><code>--header</code></td><td></td><td>Header injected into every request to the target, as <code>Name: value</code>. Repeatable, so components behind auth render in live mode.</td></tr>
         <tr><td><code>--insecure</code></td><td></td><td>Skip TLS certificate verification for the target, for a dev app behind a self-signed certificate (a local reverse proxy, mkcert, an internal CA). Also accepted by <code>swapbook check</code>.</td></tr>
         <tr><td><code>--version</code></td><td></td><td>Print the version and exit.</td></tr>
       </tbody>
     </table>
+    <div class="note">A preview frame loads stylesheets and scripts only from paths on your app; <code>cssSrc</code>, <code>jsSrc</code> and <code>htmxSrc</code> pointing at an absolute URL are ignored, because the frame runs on Swapbook's origin next to the proxy that carries your credentials. The workbench also listens on <code>127.0.0.1</code> only. It proxies your app, strips the framing headers off its responses and forwards any <code>--header</code> credential, so anyone who can open it can drive your app as you. Pass <code>--host 0.0.0.0</code> to preview from a phone or a VM, on a network you trust.</div>
     <div class="note">Previews behind auth: in <code>safe</code>/<code>live</code> mode a preview hits your real app, so protected routes return 401. Pass the credential with <code>--header 'Cookie: session=...'</code> (repeatable) and Swapbook injects it into every proxied request. Use a throwaway dev session, never a production token; it appears in your shell history.</div>
     <div class="note">Targets behind a self-signed certificate: if your app is served over TLS with a certificate nothing trusts (Traefik, Caddy, <code>mkcert</code>, a company CA), the handshake fails and the gallery stays empty. Pass <code>--insecure</code>. Give the target a scheme when you do: a schemeless target is treated as <code>http://</code>, where skipping verification does nothing, and Swapbook will say the flag was ignored rather than pretend it worked.</div>
     <h3>Headless check (CI)</h3>
