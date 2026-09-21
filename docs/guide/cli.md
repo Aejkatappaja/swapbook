@@ -59,6 +59,24 @@ only requests to your app carry the header. Because the value is a real
 credential and appears in your shell history and process list, use a throwaway
 dev session and never a production token. This is a local dev tool only.
 
+## Targets behind a self-signed certificate
+
+If your app is served over TLS with a certificate nothing trusts (a local
+reverse proxy like Traefik or Caddy, `mkcert`, a company CA), the handshake
+fails and the gallery stays empty. `--insecure` skips the verification:
+
+```
+swapbook --target https://app.localhost --insecure
+```
+
+**Pass the scheme.** A target with no scheme is treated as `http://`, where
+skipping certificate verification does nothing at all. Swapbook says so on
+startup rather than pretend the flag worked.
+
+Unlike `--header`, this does apply to the gallery's own `/_swapbook` calls: a
+handshake is a property of the connection, so every path to your app needs it or
+none of them work.
+
 ## Examples
 
 ```

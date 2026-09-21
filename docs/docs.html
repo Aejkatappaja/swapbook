@@ -278,6 +278,7 @@ app.<span class="fn">use</span>(reg.<span class="fn">router</span>());</code></p
       </tbody>
     </table>
     <div class="note">Previews behind auth: in <code>safe</code>/<code>live</code> mode a preview hits your real app, so protected routes return 401. Pass the credential with <code>--header 'Cookie: session=...'</code> (repeatable) and Swapbook injects it into every proxied request. Use a throwaway dev session, never a production token; it appears in your shell history.</div>
+    <div class="note">Targets behind a self-signed certificate: if your app is served over TLS with a certificate nothing trusts (Traefik, Caddy, <code>mkcert</code>, a company CA), the handshake fails and the gallery stays empty. Pass <code>--insecure</code>. Give the target a scheme when you do: a schemeless target is treated as <code>http://</code>, where skipping verification does nothing, and Swapbook will say the flag was ignored rather than pretend it worked.</div>
     <h3>Headless check (CI)</h3>
     <p><code>swapbook check --target :8080</code> renders every story and variant once and exits non-zero if any fail, so a build can gate on it. It reports one line per variant and fails on an unreachable target, a missing adapter, a non-2xx preview, or an empty render. A render + reachability smoke; visual-diff and a11y gating are tracked separately.</p>
     <pre><code>swapbook check --target :8080
@@ -329,6 +330,7 @@ docker run --rm -v "$PWD/test/e2e/visual:/work/test/e2e/visual" swapbook-visual 
       <li><b>Mocks are stateless.</b> You can set a mock's status (200 by default, or a non-2xx like 422/500 to exercise error swaps), but it returns the same response on every call, so stateful multi-step flows are out of scope.</li>
       <li><b>Auth is global.</b> <code>--header</code> injects the same credential into every request forwarded to the target, so a session runs as one identity (no per-story auth). Use a throwaway dev session, never a production token.</li>
       <li><b>CSS.</b> Bare-fragment previews load your app's <code>cssSrc</code>. If your styles are code-split or purged per route, point <code>cssSrc</code> at the full stylesheet.</li>
+      <li><b>TLS targets.</b> An app behind a certificate nothing trusts (a local reverse proxy, <code>mkcert</code>, a company CA) fails the handshake. Pass <code>--insecure</code> to skip verification, with the scheme on the target (<code>https://app.localhost</code>), since a schemeless target is treated as <code>http://</code> where the flag does nothing.</li>
     </ul>
     <div class="note">Swapbook strips security headers and proxies your app, so it is a local dev tool only. <b>Never run it in production or expose it publicly.</b></div>
   </main>

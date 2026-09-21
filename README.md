@@ -357,6 +357,10 @@ Swapbook is early and deliberately scoped. Known edges:
   stylesheet so previews match the app. Full-page components bring their own.
 - **Relative asset paths** inside a bare fragment may not resolve; prefer
   app-absolute paths like `/static/...`.
+- **TLS targets.** An app behind a certificate nothing trusts (a local reverse
+  proxy, `mkcert`, a company CA) fails the handshake. Pass `--insecure` to skip
+  verification, with the scheme on the target (`https://app.localhost`), since a
+  schemeless target is treated as `http://` where the flag does nothing.
 
 Swapbook strips security headers and proxies your app, so it is a local
 development tool only. Never run it in production or expose it publicly.
