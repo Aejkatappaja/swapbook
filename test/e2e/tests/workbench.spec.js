@@ -22,15 +22,15 @@ test("panels free space, stay reopenable, and persist", async ({ page }) => {
   const width = await pixels(page);
   const height = (await page.locator("#preview").boundingBox()).height;
   await page.getByRole("button", { name: "hide stories", exact: true }).click();
-  await expect(page.locator("#sidebar")).toBeHidden();
-  await expect.poll(() => pixels(page)).toBe(width + 248);
+  await expect(page.locator("#stories")).toBeHidden();
+  await expect.poll(() => pixels(page)).toBe(width + 192);
   await page.getByRole("button", { name: "hide inspector", exact: true }).click();
   await expect(page.locator("#inspector .ins-head")).toBeVisible();
   await expect(page.locator("#events")).toBeHidden();
   const collapsedHeight = (await page.locator("#inspector").boundingBox()).height;
   expect((await page.locator("#preview").boundingBox()).height).toBeGreaterThanOrEqual(height + 232 - collapsedHeight);
   await page.reload();
-  await expect(page.locator("#sidebar")).toBeHidden();
+  await expect(page.locator("#stories")).toBeHidden();
   await expect(page.locator("#inspector .ins-head")).toBeVisible();
   await expect(page.locator("#events")).toBeHidden();
   const reopen = page.getByRole("button", { name: "show inspector", exact: true });
@@ -345,15 +345,20 @@ test("collapsed inspector keeps its tabs and toggle beside clear", async ({ page
 });
 
 
-test("sidebar hide control stays inside and toolbar reopens it with keyboard focus", async ({ page }) => {
+test("collapsed sidebar rail keeps branding, position, and keyboard reopening", async ({ page }) => {
   await start(page);
   const hide = page.locator("#sidebar").getByRole("button", { name: "hide stories", exact: true });
-  const show = page.locator("#toolbar").getByRole("button", { name: "show stories", exact: true });
+  const show = page.locator("#sidebar").getByRole("button", { name: "show stories", exact: true });
   await expect(hide).toBeVisible();
   await expect(show).toBeHidden();
   await hide.focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator("#sidebar")).toBeHidden();
+  await expect(page.locator("#stories")).toBeHidden();
+  await expect(page.locator("#sidebar .brand-mark")).toBeVisible();
+  await expect(page.locator("#sidebar .brand-wm")).toBeHidden();
+  const entries = page.locator("#stories .story");
+  const position = await entries.evaluateAll((items) => items.findIndex((item) => item.classList.contains("active")) + 1);
+  await expect(page.locator("#story-position")).toHaveText(`${position}/${await entries.count()}`);
   await expect(show).toBeFocused();
   await expect(show).toHaveAttribute("aria-expanded", "false");
   await page.keyboard.press("Enter");
@@ -362,7 +367,7 @@ test("sidebar hide control stays inside and toolbar reopens it with keyboard foc
   await hide.click();
   await page.reload();
   await expect(show).toBeVisible();
-  await expect(page.locator("#sidebar")).toBeHidden();
+  await expect(page.locator("#stories")).toBeHidden();
   await show.click();
   await expect(hide).toBeVisible();
   await expect(show).toBeHidden();

@@ -40,7 +40,7 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
-body.sidebar-hidden { grid-template-columns: minmax(0, 1fr); }
+body.sidebar-hidden { grid-template-columns: 56px minmax(0, 1fr); }
 ::selection { background: var(--bg-sel); color: var(--fg-bright); }
 
 /* grain + scanline overlays */
@@ -68,6 +68,15 @@ body::after {
   border-right: 1px solid var(--border);
   overflow-y: auto;
 }
+#sidebar.collapsed { align-items: center; }
+#sidebar.collapsed .brand { padding: 15px 0 12px; }
+#sidebar.collapsed .brand-wm,
+#sidebar.collapsed .brand-sub,
+#sidebar.collapsed #story-search,
+#sidebar.collapsed #stories,
+#sidebar.collapsed .side-foot { display: none; }
+#sidebar #show-sidebar { width: 32px; height: 32px; padding: 0; font-size: 24px; line-height: 1; }
+#story-position { margin-top: 12px; max-width: 100%; padding: 0 2px; font-size: 10px; color: var(--fg-dim); overflow-wrap: anywhere; text-align: center; }
 #sidebar #toggle-sidebar { align-self: flex-start; margin: 0 12px 8px; }
 .brand {
   display: flex; align-items: center; gap: 10px;

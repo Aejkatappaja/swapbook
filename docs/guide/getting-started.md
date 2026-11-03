@@ -68,7 +68,7 @@ the built-ins; the width you pick is remembered per story. Other stacks emit the
 same `viewports` list in their manifest.
 
 Use **hide stories** in the sidebar to give the preview more space. When the
-sidebar is collapsed, **show stories** appears in the toolbar. Use **hide inspector**
+sidebar is collapsed, a slim rail keeps the logo, a **show stories** button, and the current position within the visible story entries. Use **hide inspector**
 beside **clear** in the bottom panel to collapse its content. The collapsed inspector keeps its
 tab bar at the bottom of the screen. Use **show inspector** beside **clear** to
 reopen its content. Panel visibility is remembered on this browser. Press `/` to

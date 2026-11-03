@@ -191,6 +191,15 @@ function setActiveStory() {
     b.classList.toggle("active", !!on);
     if (on) b.scrollIntoView({ block: "nearest" });
   });
+  const entries = qsa("#stories .story");
+  const position = entries.findIndex((b) => b.classList.contains("active")) + 1;
+  const indicator = el("story-position");
+  indicator.textContent = `${position || "–"}/${entries.length}`;
+  const description = position
+    ? `Item ${position} of ${entries.length} visible story entries`
+    : `${entries.length} visible story entries; current selection is not in the list`;
+  indicator.setAttribute("aria-label", description);
+  indicator.title = description;
 }
 
 function showPreview() {
@@ -481,14 +490,16 @@ function setPanelVisible(panel, visible, persist = true) {
   const button = el("toggle-" + panel);
   const hadFocus = document.activeElement === button || (panel === "sidebar" && document.activeElement === el("show-sidebar"));
   panels[panel] = visible;
-  if (panel === "inspector") el(panel).classList.toggle("collapsed", !visible);
-  else el(panel).hidden = !visible;
+  el(panel).classList.toggle("collapsed", !visible);
   document.body.classList.toggle("sidebar-hidden", !panels.sidebar);
   if (panel === "sidebar") {
     const reopen = el("show-sidebar");
+    button.hidden = !visible;
     reopen.hidden = visible;
+    el("story-position").hidden = visible;
     reopen.setAttribute("aria-expanded", String(visible));
     if (hadFocus) (visible ? button : reopen).focus();
+    if (visible) setActiveStory();
   } else button.textContent = (visible ? "hide " : "show ") + "inspector";
   button.setAttribute("aria-expanded", String(visible));
   if (persist) {
