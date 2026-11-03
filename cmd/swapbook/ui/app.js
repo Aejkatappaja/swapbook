@@ -75,6 +75,15 @@ try {
     if (typeof name === "string") collapsedGroups.add(name);
   }
 } catch {}
+const COMPONENTS_KEY = "swapbook:collapsed-components";
+/** @type {Set<string>} */
+const collapsedComponents = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(COMPONENTS_KEY) || "[]");
+  if (Array.isArray(saved)) for (const id of saved) {
+    if (typeof id === "string") collapsedComponents.add(id);
+  }
+} catch {}
 const PANELS_KEY = "swapbook:panels";
 /** @type {PanelVisibility} */
 const panels = { sidebar: true, inspector: true };
@@ -187,13 +196,34 @@ function renderStories(stories) {
       nav.append(h, container);
     }
     for (const s of items) {
+      const heading = document.createElement("button");
+      heading.type = "button";
+      heading.className = "component-heading";
+      heading.textContent = s.name;
+      heading.dataset.sid = s.id;
+      heading.setAttribute("aria-label", s.name);
+      const children = document.createElement("div");
+      children.className = "component-items";
+      children.id = "story-component-" + nav.querySelectorAll(".component-heading").length;
+      children.hidden = collapsedComponents.has(s.id) && !el("story-search").value.trim();
+      heading.setAttribute("aria-controls", children.id);
+      heading.setAttribute("aria-expanded", String(!children.hidden));
+      heading.onclick = () => {
+        children.hidden = !children.hidden;
+        heading.setAttribute("aria-expanded", String(!children.hidden));
+        if (children.hidden) collapsedComponents.add(s.id);
+        else collapsedComponents.delete(s.id);
+        try { localStorage.setItem(COMPONENTS_KEY, JSON.stringify([...collapsedComponents])); } catch {}
+        setActiveStory();
+      };
+      container.append(heading, children);
       const d = document.createElement("button");
       d.className = "story story-docs";
       d.dataset.sid = s.id;
       d.dataset.docs = "1";
       d.innerHTML = `<span class="knob">▤</span> ${esc(s.name)} · docs`;
       d.onclick = () => selectDocs(s);
-      container.appendChild(d);
+      children.appendChild(d);
       for (const v of s.variants) {
         const name = vName(v);
         const a = document.createElement("button");
@@ -202,7 +232,7 @@ function renderStories(stories) {
         a.dataset.vname = name;
         a.innerHTML = `${esc(s.name)} · ${esc(name)}${vControls(v).length ? ' <span class="knob">◧</span>' : ""}`;
         a.onclick = () => selectVariant(s, v);
-        container.appendChild(a);
+        children.appendChild(a);
       }
     }
   }
@@ -210,10 +240,11 @@ function renderStories(stories) {
 }
 
 function visibleStoryEntries() {
-  return qsa("#stories .story").filter((b) => !b.closest(".group-items[hidden]"));
+  return qsa("#stories .story").filter((b) => !b.closest(".group-items[hidden], .component-items[hidden]"));
 }
 
 function setActiveStory() {
+  qsa(".component-heading").forEach((b) => b.classList.toggle("active", !!current && b.dataset.sid === current.story.id));
   qsa(".story").forEach((b) => {
     const isDocs = b.dataset.docs === "1";
     const on = current && b.dataset.sid === current.story.id &&

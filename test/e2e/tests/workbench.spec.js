@@ -409,3 +409,39 @@ test("story groups collapse independently, persist, and reveal search matches", 
   await page.keyboard.press("j");
   await expect(page.locator("#stories .story.active")).not.toHaveAttribute("data-sid", "play");
 });
+
+test("components collapse inside groups without changing preview or sibling state", async ({ page }) => {
+  await page.route("**/__sb/api/manifest", async (route) => {
+    const manifest = await (await route.fetch()).json();
+    manifest.stories.forEach((story) => { story.group = "Components"; });
+    await route.fulfill({ json: manifest });
+  });
+  await start(page);
+  const heading = page.locator('.component-heading[data-sid="play"]');
+  const sibling = page.locator('.component-heading[data-sid="sse"]');
+  const children = page.locator(".component-items").filter({ has: page.locator('[data-sid="play"]') });
+  const group = page.getByRole("button", { name: "Components", exact: true });
+  await heading.focus();
+  await page.keyboard.press("Space");
+  await expect(heading).toBeVisible();
+  await expect(heading).toHaveAttribute("aria-expanded", "false");
+  await expect(children).toBeHidden();
+  await expect(sibling).toHaveAttribute("aria-expanded", "true");
+  await expect(page.frameLocator("#preview").locator("#go")).toBeVisible();
+  await group.click();
+  await group.click();
+  await expect(children).toBeHidden();
+  await page.reload();
+  await expect(heading).toHaveAttribute("aria-expanded", "false");
+  await page.locator("#story-search").fill("play");
+  await expect(children).toBeVisible();
+  await page.locator("#story-search").fill("");
+  await expect(children).toBeHidden();
+  await heading.focus();
+  await page.keyboard.press("j");
+  await expect(page.locator("#stories .story.active")).not.toHaveAttribute("data-sid", "play");
+  await heading.click();
+  await expect(children).toBeVisible();
+  await page.reload();
+  await expect(heading).toHaveAttribute("aria-expanded", "true");
+});
