@@ -221,7 +221,7 @@ function renderStories(stories) {
       d.className = "story story-docs";
       d.dataset.sid = s.id;
       d.dataset.docs = "1";
-      d.innerHTML = `<span class="knob">▤</span> ${esc(s.name)} · docs`;
+      d.innerHTML = `<span class="knob" aria-hidden="true">▤</span> docs`;
       d.onclick = () => selectDocs(s);
       children.appendChild(d);
       for (const v of s.variants) {
@@ -230,7 +230,7 @@ function renderStories(stories) {
         a.className = "story";
         a.dataset.sid = s.id;
         a.dataset.vname = name;
-        a.innerHTML = `${esc(s.name)} · ${esc(name)}${vControls(v).length ? ' <span class="knob">◧</span>' : ""}`;
+        a.innerHTML = `${esc(name)}${vControls(v).length ? ' <span class="knob">◧</span>' : ""}`;
         a.onclick = () => selectVariant(s, v);
         children.appendChild(a);
       }
