@@ -10,6 +10,8 @@
  * @typedef {string | VariantObj} Variant  variants may be a bare name (hand-rolled targets) or an object
  * @typedef {{ id: string, name: string, group?: string, docs?: string, variants: Variant[] }} Story
  * @typedef {{ name: string, w: string }} Viewport  a project-declared preview width
+ * @typedef {{ kind: "preset", label: string } | { kind: "pixels", value: number }} WidthChoice
+ * @typedef {{ sidebar: boolean, inspector: boolean }} PanelVisibility
  * @typedef {string | string[]} Srcs one asset path, or several in load order
  * @typedef {{ htmxSrc?: string, cssSrc?: Srcs, jsSrc?: Srcs, stories?: Story[], viewports?: Viewport[] }} Manifest
  * @typedef {{ source: string, seq?: number, event: string, data?: any }} SBMessage  posted by the frame's inspector
@@ -25,6 +27,8 @@ const WIDTHS = [
 let allWidths = WIDTHS.slice();
 /** @param {unknown} label @returns {boolean} is this a known viewport label */
 const hasWidth = (label) => allWidths.some((w) => w.label === label);
+const MIN_WIDTH = 240;
+const MAX_WIDTH = 3840;
 const MODES = ["mock", "safe", "live"];
 const MODE_TITLES = {
   mock: "mocked routes served locally, unmocked writes blocked",
@@ -38,17 +42,30 @@ let htmxSrc = "";
 /** @type {string[]} */ let cssSrcs = [];
 /** @type {string[]} */ let jsSrcs = [];
 let mode = "mock";
-let widthLabel = "full";
-let bg = localStorage.getItem("swapbook:bg") || "dark";
+/** @type {WidthChoice} */
+let widthChoice = { kind: "preset", label: "full" };
+let bg = "dark";
+try { bg = localStorage.getItem("swapbook:bg") || bg; } catch {}
 // Per-story viewport memory: switching to a story restores the width last used
 // for it. An explicit URL "w" still wins, so shared links stay exact.
 const VW_KEY = "swapbook:viewports";
-/** @type {Record<string, string>} storyId -> viewport label */
+/** @type {Record<string, unknown>} storyId -> saved width choice */
 let vwMem = {};
 try {
   const parsed = JSON.parse(localStorage.getItem(VW_KEY) || "{}");
-  if (parsed && typeof parsed === "object") vwMem = parsed;
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) vwMem = parsed;
 } catch {}
+const PANELS_KEY = "swapbook:panels";
+/** @type {PanelVisibility} */
+const panels = { sidebar: true, inspector: true };
+try {
+  const saved = JSON.parse(localStorage.getItem(PANELS_KEY) || "{}");
+  for (const panel of ["sidebar", "inspector"]) {
+    if (typeof saved?.[panel] === "boolean") panels[panel] = saved[panel];
+  }
+} catch {}
+/** @type {{ pointerId: number, offset: number, scrollLeft: number, original: WidthChoice } | null} */
+let widthDrag = null;
 /** @type {Story[]} */ let allStories = [];
 /** @type {{ story: Story, variant: Variant } | null} */ let current = null;
 /** @type {Record<string, any>} */ let args = {};
@@ -103,6 +120,7 @@ async function fetchManifest() {
 
 async function boot() {
   renderBars();
+  initWorkbench();
   el("run-play").onclick = runPlay;
   const m = await fetchManifest();
   if (m.state === "ok") {
@@ -163,11 +181,14 @@ function setActiveStory() {
 }
 
 function showPreview() {
-  el("preview").hidden = false;
+  el("preview-shell").hidden = false;
+  el("width-readout").hidden = false;
   el("autodocs").hidden = true;
 }
 function showAutodocs() {
-  el("preview").hidden = true;
+  finishWidthDrag(false);
+  el("preview-shell").hidden = true;
+  el("width-readout").hidden = true;
   el("autodocs").hidden = false;
 }
 
@@ -185,7 +206,7 @@ function selectVariant(story, v, stateArgs, width) {
   // Resolve the viewport once: an explicit width (from the URL) wins, else the
   // one last used for this story, else full. Applied without persisting, since
   // only a deliberate pick should write the story's remembered width.
-  setWidth(width || (hasWidth(vwMem[story.id]) ? vwMem[story.id] : "full"), false);
+  setWidth(width || parseWidth(vwMem[story.id]) || "full", false);
   loadFrame();
   writeState();
 }
@@ -374,7 +395,7 @@ function segmented(containerId, values, onpick, title) {
 // (which may add project viewports) can refresh it without touching mode/bg.
 function renderWidths() {
   setWidthActive = segmented("widths", allWidths.map((w) => w.label), setWidth);
-  setWidthActive(widthLabel);
+  setWidthActive(widthChoice.kind === "preset" ? widthChoice.label : "");
 }
 function renderBars() {
   setModeActive = segmented("modes", MODES, setMode, (v) => MODE_TITLES[v] || "");
@@ -390,20 +411,104 @@ function setMode(m) {
   loadFrame();
   writeState();
 }
-// setWidth applies a viewport. persist=false is used for per-story recall (the
-// caller writes state itself); a deliberate pick (button/keyboard) persists the
-// story's remembered width and writes state here.
-function setWidth(label, persist = true) {
-  const p = allWidths.find((x) => x.label === label) || allWidths[0];
-  widthLabel = p.label;
-  el("preview").style.width = p.w;
-  setWidthActive(p.label);
+/** @param {unknown} value @returns {WidthChoice | null} */
+function parseWidth(value) {
+  if (typeof value === "string") return hasWidth(value) ? { kind: "preset", label: value } : null;
+  if (!value || typeof value !== "object") return null;
+  if ("kind" in value && value.kind === "preset" && "label" in value && typeof value.label === "string") {
+    return parseWidth(value.label);
+  }
+  if ("kind" in value && value.kind === "pixels" && "value" in value && typeof value.value === "number" &&
+      Number.isInteger(value.value) && value.value >= MIN_WIDTH && value.value <= MAX_WIDTH) {
+    return { kind: "pixels", value: value.value };
+  }
+  return null;
+}
+/** @param {string | WidthChoice} choice @param {boolean} [persist] */
+function setWidth(choice, persist = true) {
+  widthChoice = parseWidth(choice) || { kind: "preset", label: "full" };
+  const label = widthChoice.kind === "preset" ? widthChoice.label : "";
+  el("preview-shell").style.width = widthChoice.kind === "pixels" ? widthChoice.value + "px" : allWidths.find((p) => p.label === label).w;
+  setWidthActive(label);
+  updateWidthReadout();
   if (!persist) return;
   if (current) {
-    vwMem[current.story.id] = p.label;
+    vwMem[current.story.id] = widthChoice;
     try { localStorage.setItem(VW_KEY, JSON.stringify(vwMem)); } catch {}
   }
   writeState();
+}
+
+/** @param {keyof PanelVisibility} panel @param {boolean} visible @param {boolean} [persist] */
+function setPanelVisible(panel, visible, persist = true) {
+  finishWidthDrag(false);
+  panels[panel] = visible;
+  el(panel).hidden = !visible;
+  document.body.classList.toggle("sidebar-hidden", !panels.sidebar);
+  const button = el("toggle-" + panel);
+  button.textContent = (visible ? "hide " : "show ") + (panel === "sidebar" ? "stories" : "inspector");
+  button.setAttribute("aria-expanded", String(visible));
+  if (persist) {
+    try { localStorage.setItem(PANELS_KEY, JSON.stringify(panels)); } catch {}
+  }
+  updateWidthReadout();
+}
+
+function updateWidthReadout() {
+  const pixels = el("preview").clientWidth;
+  el("width-readout").textContent = pixels + "px";
+  el("resize-width").setAttribute("aria-valuemin", String(Math.min(MIN_WIDTH, pixels)));
+  el("resize-width").setAttribute("aria-valuemax", String(Math.max(MAX_WIDTH, pixels)));
+  el("resize-width").setAttribute("aria-valuenow", String(pixels));
+  el("resize-width").setAttribute("aria-valuetext", pixels + " pixels");
+}
+
+function finishWidthDrag(commit) {
+  if (!widthDrag) return;
+  const drag = widthDrag;
+  widthDrag = null;
+  document.body.classList.remove("resizing-preview");
+  const handle = el("resize-width");
+  if (handle.hasPointerCapture(drag.pointerId)) handle.releasePointerCapture(drag.pointerId);
+  setWidth(commit ? widthChoice : drag.original, commit);
+}
+
+function initWorkbench() {
+  for (const panel of /** @type {(keyof PanelVisibility)[]} */ (["sidebar", "inspector"])) {
+    setPanelVisible(panel, panels[panel], false);
+    el("toggle-" + panel).onclick = () => setPanelVisible(panel, !panels[panel]);
+  }
+  const handle = el("resize-width");
+  handle.onpointerdown = (e) => {
+    if (e.button !== 0 || widthDrag) return;
+    e.preventDefault();
+    handle.focus();
+    widthDrag = { pointerId: e.pointerId, offset: e.clientX - el("preview-shell").getBoundingClientRect().right, scrollLeft: el("stage").scrollLeft, original: widthChoice };
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing-preview");
+  };
+  handle.onpointermove = (e) => {
+    if (!widthDrag || e.pointerId !== widthDrag.pointerId) return;
+    const stage = el("stage");
+    const style = getComputedStyle(stage);
+    const leftPadding = parseFloat(style.paddingLeft);
+    const available = stage.clientWidth - leftPadding - parseFloat(style.paddingRight);
+    const right = e.clientX - widthDrag.offset - stage.getBoundingClientRect().left - leftPadding + widthDrag.scrollLeft;
+    const pixels = right <= available ? 2 * right - available : right;
+    setWidth({ kind: "pixels", value: Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(pixels))) }, false);
+  };
+  handle.onpointerup = (e) => { if (widthDrag?.pointerId === e.pointerId) finishWidthDrag(true); };
+  handle.onpointercancel = () => finishWidthDrag(false);
+  handle.onlostpointercapture = () => finishWidthDrag(false);
+  handle.onkeydown = (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    finishWidthDrag(false);
+    const pixels = el("preview").clientWidth + (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 10 : 1);
+    setWidth({ kind: "pixels", value: Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, pixels)) });
+  };
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(updateWidthReadout).observe(el("preview"));
+  window.addEventListener("resize", () => { finishWidthDrag(false); updateWidthReadout(); });
 }
 // bgCanvas maps a bg choice to the canvas (#stage) backdrop. dark is kept
 // distinct from the preview surface so a resized preview stays visible on it.
@@ -433,7 +538,8 @@ function stateString() {
     for (const [k, v] of Object.entries(args)) if (v != null && v !== "") p.set("arg." + k, v);
   }
   p.set("mode", mode);
-  p.set("w", widthLabel);
+  if (widthChoice.kind === "preset") p.set("w", widthChoice.label);
+  else p.set("px", String(widthChoice.value));
   p.set("bg", bg);
   return p.toString();
 }
@@ -449,7 +555,8 @@ function applyParams(str) {
   if (!story) return false;
   const v = story.variants.find((x) => vName(x) === p.get("variant")) || story.variants[0];
   if (MODES.includes(p.get("mode"))) mode = p.get("mode");
-  const urlW = hasWidth(p.get("w")) ? p.get("w") : null;
+  const rawPixels = p.get("px");
+  const urlW = (rawPixels && /^\d+$/.test(rawPixels) ? parseWidth({ kind: "pixels", value: Number(rawPixels) }) : null) || parseWidth(p.get("w"));
   if (BGS.includes(p.get("bg"))) bg = p.get("bg");
   setModeActive(mode);
   setBgActive(bg);
@@ -749,9 +856,11 @@ document.addEventListener("keydown", (e) => {
   const active = /** @type {HTMLElement} */ (document.activeElement);
   const tag = active && active.tagName;
   const typing = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
+  if (e.key === "Escape" && widthDrag) { e.preventDefault(); finishWidthDrag(false); return; }
   if (e.key === "Escape" && typing) return active.blur();
   if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.key === "/") { e.preventDefault(); return el("story-search").focus(); }
+  if (widthDrag && (["j", "k", "m"].includes(e.key) || (e.key >= "1" && e.key <= "9"))) finishWidthDrag(false);
+  if (e.key === "/") { e.preventDefault(); setPanelVisible("sidebar", true); return el("story-search").focus(); }
   if (e.key === "j") { e.preventDefault(); return moveStory(1); }
   if (e.key === "k") { e.preventDefault(); return moveStory(-1); }
   if (e.key >= "1" && e.key <= "9") {

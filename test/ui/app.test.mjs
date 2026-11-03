@@ -65,7 +65,7 @@ const MANIFEST_VW = JSON.stringify({
     { id: "todo-list", name: "Todo list", variants: [{ name: "default" }] },
   ],
 });
-const widthOf = (w) => w.document.getElementById("preview").style.width;
+const widthOf = (w) => w.document.getElementById("preview-shell").style.width;
 
 test("project viewports extend the built-in width buttons", async () => {
   const w = await boot(
@@ -143,4 +143,14 @@ test("a list in htmxSrc collapses to its first entry", async () => {
     "story=button&variant=primary",
   );
   assert.deepEqual(frameQuery(w).getAll("htmx"), ["/static/htmx.js"]);
+});
+
+test("invalid pixel links fall back to the selected preset or story memory", async () => {
+  const w = await boot(async () => res(200, MANIFEST_VW), (w) => txt(w, "stories").includes("Button"));
+  w.applyParams("story=button&variant=primary&w=phone&px=1000000");
+  assert.equal(widthOf(w), "375px");
+  for (const px of ["NaN", "400.5", "1e3", "-10", "0", "239", "3841"]) {
+    w.applyParams("story=button&variant=primary&w=tablet&px=" + px);
+    assert.equal(widthOf(w), "768px");
+  }
 });

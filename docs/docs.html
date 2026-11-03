@@ -161,6 +161,9 @@ reg.<span class="fn">RegisterIn</span>(<span class="st">"actions"</span>, <span 
 reg.<span class="fn">DocStory</span>(<span class="st">"Button"</span>, <span class="st">"The button primitive."</span>)</code></pre>
     <p class="muted">Viewports set via <code>reg.Viewports</code> appear in the toolbar's width bar next to the built-in full/tablet/phone, and the width you pick is remembered per story. Other stacks take a <code>viewports</code> arg on the registry too (Django/Rails/PHP).</p>
 
+    <p>Use <strong>hide stories</strong> or <strong>hide inspector</strong> in the toolbar to give the preview more space. The buttons stay visible so you can reopen either panel. Panel visibility is remembered on this browser. Press <code>/</code> to reopen the sidebar and search.</p>
+    <p>Drag the grip on the preview's right edge to set a width between 240 and 3840 pixels. The toolbar reports the preview's actual viewport width. Focus the grip and use the arrow keys for 1-pixel changes, or Shift with an arrow key for 10-pixel changes. Press Escape during a drag to cancel it. Presets remain shortcuts, and <strong>full</strong> follows the available space. Custom widths are remembered per story and included in shared links. Resizing keeps the current preview loaded.</p>
+
     <h3>Django</h3>
     <pre><code><span class="kw">from</span> swapbook_adapter <span class="kw">import</span> Registry, variant
 

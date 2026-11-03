@@ -67,6 +67,17 @@ Any viewports set via `reg.Viewports` appear in the toolbar's width bar next to
 the built-ins; the width you pick is remembered per story. Other stacks emit the
 same `viewports` list in their manifest.
 
+Use **hide stories** or **hide inspector** in the toolbar to give the preview more
+space. The buttons stay visible so you can reopen either panel. Panel visibility
+is remembered on this browser. Press `/` to reopen the sidebar and search.
+
+Drag the grip on the preview's right edge to set a width between 240 and 3840
+pixels. The toolbar reports the preview's actual viewport width. Focus the grip
+and use the arrow keys for 1-pixel changes, or Shift with an arrow key for
+10-pixel changes. Press Escape during a drag to cancel it. Presets remain
+shortcuts, and **full** follows the available space. Custom widths are remembered
+per story and included in shared links. Resizing keeps the current preview loaded.
+
 ## How it works
 
 Every request that is not part of the gallery UI is proxied to your app

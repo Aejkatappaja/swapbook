@@ -32,8 +32,10 @@
   <header id="toolbar">
     <span id="current"><span class="p">$</span> select a story</span>
     <div class="tools">
+      <button id="toggle-sidebar" aria-controls="sidebar" aria-expanded="true">hide stories</button>
+      <button id="toggle-inspector" aria-controls="inspector" aria-expanded="true">hide inspector</button>
       <div class="seg"><span class="seg-label">mode</span><div class="modes" id="modes"></div></div>
-      <div class="seg"><span class="seg-label">width</span><div class="widths" id="widths"></div></div>
+      <div class="seg"><span class="seg-label">width</span><div class="widths" id="widths"></div><output id="width-readout" aria-label="Preview width"></output></div>
       <div class="seg"><span class="seg-label">bg</span><div class="bgs" id="bgs"></div></div>
       <button id="copy-link" title="copy a shareable link to this state">link ⧉</button>
       <button id="open-tab" title="open preview in a new tab">open ↗</button>
@@ -43,7 +45,10 @@
   <div id="controls" hidden></div>
 
   <div id="stage">
-    <iframe id="preview" title="preview"></iframe>
+    <div id="preview-shell">
+      <iframe id="preview" title="preview"></iframe>
+      <div id="resize-width" role="separator" tabindex="0" aria-label="Resize preview width" aria-orientation="vertical" aria-controls="preview" title="Drag to resize. Arrow keys adjust by 1px; Shift adjusts by 10px."></div>
+    </div>
     <div id="autodocs" class="autodocs" hidden></div>
     <div id="stage-error" hidden>
       <div class="err-mark">✕</div>
