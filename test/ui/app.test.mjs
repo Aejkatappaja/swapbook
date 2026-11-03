@@ -154,3 +154,26 @@ test("invalid pixel links fall back to the selected preset or story memory", asy
     assert.equal(widthOf(w), "768px");
   }
 });
+
+test("viewport links accept height and retain legacy width state", async () => {
+  const w = await boot(async () => res(200, MANIFEST_VW), (w) => txt(w, "stories").includes("Button"));
+  const shell = w.document.getElementById("preview-shell");
+  w.applyParams("story=button&variant=primary&px=640&h=480");
+  assert.equal(widthOf(w), "640px");
+  assert.equal(shell.style.height, "480px");
+  for (const h of ["NaN", "400.5", "1e3", "-10", "0", "159", "2161"]) {
+    w.applyParams("story=button&variant=primary&w=tablet&h=" + h);
+    assert.equal(widthOf(w), "768px");
+    assert.equal(shell.style.height, "100%");
+  }
+  w.applyParams("story=button&variant=primary&w=phone");
+  assert.equal(shell.style.height, "100%");
+  w.setWidth("phone");
+  w.applyParams("story=button&variant=primary&h=350");
+  assert.equal(widthOf(w), "375px");
+  assert.equal(shell.style.height, "350px");
+  w.setWidth("phone");
+  w.applyParams("story=button&variant=primary&h=NaN");
+  assert.equal(widthOf(w), "375px");
+  assert.equal(shell.style.height, "100%");
+});

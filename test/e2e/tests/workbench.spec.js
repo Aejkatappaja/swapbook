@@ -7,7 +7,8 @@ const start = async (page, params = "") => {
 const pixels = (page) => page.locator("#preview").evaluate((frame) => frame.contentWindow.innerWidth);
 const widthIs = async (page, width) => {
   await expect.poll(() => pixels(page)).toBe(width);
-  await expect(page.locator("#width-readout")).toHaveText(width + "px");
+  const height = await page.locator("#preview").evaluate((frame) => frame.contentWindow.innerHeight);
+  await expect(page.locator("#width-readout")).toHaveText(`${width} × ${height} px`);
 };
 async function drag(page, delta, finish = true) {
   const box = await page.locator("#resize-width").boundingBox();
@@ -71,6 +72,8 @@ test("cancel restores preset and input; docs hide controls", async ({ page }) =>
   await page.locator('[data-sid="play"][data-docs="1"]').click();
   await expect(page.locator("#resize-width")).toBeHidden();
   await expect(page.locator("#width-readout")).toBeHidden();
+  await expect(page.locator("#fit-height")).toBeHidden();
+  for (const handle of await page.locator(".resize-handle").all()) await expect(handle).toBeHidden();
 });
 test("shared widths override memory without changing it", async ({ page }) => {
   await start(page, "&w=phone");
@@ -173,3 +176,141 @@ test("preset shortcuts end a drag before changing the saved width", async ({ pag
   await page.locator('[data-sid="play"][data-vname="default"]').click();
   await widthIs(page, 768);
 });
+
+const sizeOf = (page) => page.locator("#preview").evaluate((frame) => [frame.contentWindow.innerWidth, frame.contentWindow.innerHeight]);
+async function sizeIs(page, width, height) {
+  await expect.poll(() => sizeOf(page)).toEqual([width, height]);
+  await expect(page.locator("#width-readout")).toHaveText(`${width} × ${height} px`);
+}
+async function dragEdge(page, edge, dx, dy, finish = true) {
+  const box = await page.locator(`[data-edge="${edge}"]`).boundingBox();
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + dx, y + dy, { steps: 8 });
+  if (finish) await page.mouse.up();
+}
+for (const [edge, x, y] of [["n",0,-1], ["ne",1,-1], ["e",1,0], ["se",1,1], ["s",0,1], ["sw",-1,1], ["w",-1,0], ["nw",-1,-1]]) {
+  test(`${edge} handle grows and shrinks its axes without reloading`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await start(page, "&px=640&h=320");
+    await page.frameLocator("#preview").locator("#go").click();
+    await dragEdge(page, edge, x * 20, y * 20);
+    await sizeIs(page, 640 + Math.abs(x) * 40, 320 + Math.abs(y) * 40);
+    await dragEdge(page, edge, -x * 20, -y * 20);
+    await sizeIs(page, 640, 320);
+    await expect(page.frameLocator("#preview").locator("#out")).toHaveText("clicked");
+  });
+}
+test("height persists with width, presets preserve height, and old links restore auto height", async ({ page }) => {
+  await start(page, "&w=phone&h=300");
+  await page.locator('[data-edge="s"]').press("ArrowDown");
+  await sizeIs(page, 375, 301);
+  await page.getByRole("button", { name: "tablet", exact: true }).click();
+  await sizeIs(page, 768, 301);
+  await page.reload();
+  await sizeIs(page, 768, 301);
+  await start(page, "&px=641&h=400");
+  await sizeIs(page, 641, 400);
+  await page.locator('[data-sid="sse"][data-vname="default"]').click();
+  await page.locator('[data-sid="play"][data-vname="default"]').click();
+  await sizeIs(page, 768, 301);
+  await start(page, "&w=phone");
+  expect((await sizeOf(page))[1]).toBeGreaterThan(301);
+  await expect(page.locator("#fit-height")).toHaveAttribute("aria-pressed", "true");
+});
+test("fixed height survives panel and browser changes, fit height resumes automatic height", async ({ page }) => {
+  await start(page, "&px=640&h=320");
+  await page.getByRole("button", { name: "hide inspector", exact: true }).click();
+  await page.setViewportSize({ width: 1400, height: 1000 });
+  await sizeIs(page, 640, 320);
+  await page.getByRole("button", { name: "fit height", exact: true }).click();
+  const height = (await sizeOf(page))[1];
+  expect(height).toBeGreaterThan(320);
+  await expect(page).not.toHaveURL(/(?:&|#)h=/);
+  await page.setViewportSize({ width: 1400, height: 1100 });
+  await sizeIs(page, 640, height + 100);
+});
+test("corner keyboard changes both axes and cancellation restores the complete snapshot", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await start(page, "&w=phone&h=300");
+  const handle = page.locator('[data-edge="nw"]');
+  await handle.press("Shift+ArrowLeft");
+  await handle.press("ArrowUp");
+  await sizeIs(page, 385, 301);
+  const savedURL = page.url();
+  await dragEdge(page, "se", 30, 20, false);
+  await sizeIs(page, 445, 341);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await sizeIs(page, 385, 301);
+  expect(page.url()).toBe(savedURL);
+  await dragEdge(page, "ne", 20, -20, false);
+  await page.locator('[data-edge="ne"]').dispatchEvent("pointercancel", { pointerType: "touch" });
+  await page.mouse.up();
+  await sizeIs(page, 385, 301);
+  await expect(page.locator("body")).not.toHaveClass(/resizing-preview/);
+});
+test("corner drag shortcut restores both dimensions before selecting a preset", async ({ page }) => {
+  await start(page, "&w=phone&h=300");
+  await dragEdge(page, "se", 20, 20, false);
+  await page.keyboard.press("2");
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await sizeIs(page, 768, 300);
+  await page.reload();
+  await sizeIs(page, 768, 300);
+});
+test("vertical scroll clamping does not feed back into height and height bounds hold", async ({ page }) => {
+  await start(page, "&px=640&h=1000");
+  await page.locator("#stage").evaluate((stage) => { stage.scrollTop = stage.scrollHeight; });
+  await dragEdge(page, "s", 0, -80);
+  await sizeIs(page, 640, 920);
+  await start(page, "&px=640&h=160");
+  await page.locator('[data-edge="s"]').press("ArrowUp");
+  await sizeIs(page, 640, 160);
+  await start(page, "&px=640&h=2160");
+  await page.locator('[data-edge="s"]').press("ArrowDown");
+  await sizeIs(page, 640, 2160);
+});
+
+test("touch can resize a corner", async ({ page, context }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await start(page, "&px=640&h=320");
+  const box = await page.locator('[data-edge="se"]').boundingBox();
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  const session = await context.newCDPSession(page);
+  await session.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y, id: 1 }] });
+  await session.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x + 20, y: y + 20, id: 1 }] });
+  await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sizeIs(page, 680, 360);
+  await session.detach();
+});
+
+test("manifest replacement cancels a drag before removing its preset", async ({ page }) => {
+  let changed = false;
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/__sb/api/manifest", async (route) => {
+    const manifest = await (await route.fetch()).json();
+    manifest.viewports = changed ? [] : [{ name: "custom", w: "640px" }];
+    await route.fulfill({ json: manifest });
+  });
+  await start(page, "&w=custom&h=300");
+  await dragEdge(page, "se", 15, 15, false);
+  changed = true;
+  await expect(page.locator('#widths button[data-val="custom"]')).toHaveCount(0);
+  await page.mouse.up();
+  await expect(page.locator("body")).not.toHaveClass(/resizing-preview/);
+  await page.getByRole("button", { name: "fit height", exact: true }).click();
+  expect(errors).toEqual([]);
+});
+
+for (const saved of ["phone", { kind: "pixels", value: 641 }]) {
+  test(`legacy saved viewport ${JSON.stringify(saved)} restores automatic height`, async ({ page }) => {
+    await page.addInitScript((saved) => localStorage.setItem("swapbook:viewports", JSON.stringify({ play: saved })), saved);
+    await start(page);
+    await widthIs(page, typeof saved === "string" ? 375 : 641);
+    await expect(page.locator("#fit-height")).toHaveAttribute("aria-pressed", "true");
+  });
+}

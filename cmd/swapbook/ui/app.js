@@ -11,6 +11,8 @@
  * @typedef {{ id: string, name: string, group?: string, docs?: string, variants: Variant[] }} Story
  * @typedef {{ name: string, w: string }} Viewport  a project-declared preview width
  * @typedef {{ kind: "preset", label: string } | { kind: "pixels", value: number }} WidthChoice
+ * @typedef {{ width: WidthChoice, height: number | null }} ViewportChoice
+ * @typedef {{ x: -1 | 0 | 1, y: -1 | 0 | 1, label: string }} ResizeDirection
  * @typedef {{ sidebar: boolean, inspector: boolean }} PanelVisibility
  * @typedef {string | string[]} Srcs one asset path, or several in load order
  * @typedef {{ htmxSrc?: string, cssSrc?: Srcs, jsSrc?: Srcs, stories?: Story[], viewports?: Viewport[] }} Manifest
@@ -29,6 +31,15 @@ let allWidths = WIDTHS.slice();
 const hasWidth = (label) => allWidths.some((w) => w.label === label);
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 3840;
+const MIN_HEIGHT = 160;
+const MAX_HEIGHT = 2160;
+/** @type {Record<string, ResizeDirection>} */
+const RESIZE_HANDLES = {
+  n: { x: 0, y: -1, label: "top" }, ne: { x: 1, y: -1, label: "top right" },
+  e: { x: 1, y: 0, label: "right" }, se: { x: 1, y: 1, label: "bottom right" },
+  s: { x: 0, y: 1, label: "bottom" }, sw: { x: -1, y: 1, label: "bottom left" },
+  w: { x: -1, y: 0, label: "left" }, nw: { x: -1, y: -1, label: "top left" },
+};
 const MODES = ["mock", "safe", "live"];
 const MODE_TITLES = {
   mock: "mocked routes served locally, unmocked writes blocked",
@@ -42,8 +53,8 @@ let htmxSrc = "";
 /** @type {string[]} */ let cssSrcs = [];
 /** @type {string[]} */ let jsSrcs = [];
 let mode = "mock";
-/** @type {WidthChoice} */
-let widthChoice = { kind: "preset", label: "full" };
+/** @type {ViewportChoice} */
+let viewport = { width: { kind: "preset", label: "full" }, height: null };
 let bg = "dark";
 try { bg = localStorage.getItem("swapbook:bg") || bg; } catch {}
 // Per-story viewport memory: switching to a story restores the width last used
@@ -64,8 +75,8 @@ try {
     if (typeof saved?.[panel] === "boolean") panels[panel] = saved[panel];
   }
 } catch {}
-/** @type {{ pointerId: number, offset: number, scrollLeft: number, original: WidthChoice } | null} */
-let widthDrag = null;
+/** @type {{ pointerId: number, handle: HTMLElement, x: number, y: number, width: number, height: number, availableWidth: number, availableHeight: number, original: ViewportChoice } | null} */
+let resizeDrag = null;
 /** @type {Story[]} */ let allStories = [];
 /** @type {{ story: Story, variant: Variant } | null} */ let current = null;
 /** @type {Record<string, any>} */ let args = {};
@@ -87,6 +98,7 @@ const el = (id) => document.getElementById(id);
 // asset paths + stories it carries. Shared by boot and poll so a rebuild that
 // changes hashed asset URLs is picked up, not just the story list.
 function applyManifest(text) {
+  finishResize(false);
   manifestRaw = text;
   const m = JSON.parse(text);
   htmxSrc = srcList(m.htmxSrc)[0] || ""; // a document runs one htmx, so take the first
@@ -102,6 +114,7 @@ function applyManifest(text) {
     }
   }
   renderWidths(); // the manifest may add viewports, so rebuild the width bar
+  if (!parseWidth(viewport.width)) setViewport({ width: { kind: "preset", label: "full" }, height: viewport.height }, false);
 }
 
 // fetchManifest classifies the target: "ok" (adapter answered with a manifest),
@@ -183,16 +196,19 @@ function setActiveStory() {
 function showPreview() {
   el("preview-shell").hidden = false;
   el("width-readout").hidden = false;
+  el("fit-height").hidden = false;
   el("autodocs").hidden = true;
 }
 function showAutodocs() {
-  finishWidthDrag(false);
+  finishResize(false);
   el("preview-shell").hidden = true;
   el("width-readout").hidden = true;
+  el("fit-height").hidden = true;
   el("autodocs").hidden = false;
 }
 
-function selectVariant(story, v, stateArgs, width) {
+function selectVariant(story, v, stateArgs, size) {
+  finishResize(false);
   docsView = false;
   showPreview();
   current = { story, variant: v };
@@ -203,15 +219,13 @@ function selectVariant(story, v, stateArgs, width) {
   renderControls(vControls(v));
   renderDocs(vDocs(v));
   el("run-play").hidden = vPlay(v).length === 0;
-  // Resolve the viewport once: an explicit width (from the URL) wins, else the
-  // one last used for this story, else full. Applied without persisting, since
-  // only a deliberate pick should write the story's remembered width.
-  setWidth(width || parseWidth(vwMem[story.id]) || "full", false);
+  setViewport(size || parseViewport(vwMem[story.id]) || { width: { kind: "preset", label: "full" }, height: null }, false);
   loadFrame();
   writeState();
 }
 
 function selectDocs(story) {
+  finishResize(false);
   docsView = true;
   current = { story, variant: story.variants[0] };
   args = {};
@@ -395,7 +409,7 @@ function segmented(containerId, values, onpick, title) {
 // (which may add project viewports) can refresh it without touching mode/bg.
 function renderWidths() {
   setWidthActive = segmented("widths", allWidths.map((w) => w.label), setWidth);
-  setWidthActive(widthChoice.kind === "preset" ? widthChoice.label : "");
+  setWidthActive(viewport.width.kind === "preset" ? viewport.width.label : "");
 }
 function renderBars() {
   setModeActive = segmented("modes", MODES, setMode, (v) => MODE_TITLES[v] || "");
@@ -406,6 +420,7 @@ function renderBars() {
   el("stage").style.background = bgCanvas(bg);
 }
 function setMode(m) {
+  finishResize(false);
   mode = m;
   setModeActive(m);
   loadFrame();
@@ -424,16 +439,37 @@ function parseWidth(value) {
   }
   return null;
 }
+/** @param {unknown} value @returns {number | null} */
+function parseHeight(value) {
+  return typeof value === "number" && Number.isInteger(value) && value >= MIN_HEIGHT && value <= MAX_HEIGHT ? value : null;
+}
+/** @param {unknown} value @returns {ViewportChoice | null} */
+function parseViewport(value) {
+  if (value && typeof value === "object" && "width" in value) {
+    const width = parseWidth(value.width);
+    const height = "height" in value ? parseHeight(value.height) : null;
+    return width || height !== null ? { width: width || { kind: "preset", label: "full" }, height } : null;
+  }
+  const width = parseWidth(value);
+  return width ? { width, height: null } : null;
+}
 /** @param {string | WidthChoice} choice @param {boolean} [persist] */
 function setWidth(choice, persist = true) {
-  widthChoice = parseWidth(choice) || { kind: "preset", label: "full" };
-  const label = widthChoice.kind === "preset" ? widthChoice.label : "";
-  el("preview-shell").style.width = widthChoice.kind === "pixels" ? widthChoice.value + "px" : allWidths.find((p) => p.label === label).w;
+  finishResize(false);
+  setViewport({ width: parseWidth(choice) || { kind: "preset", label: "full" }, height: viewport.height }, persist);
+}
+/** @param {ViewportChoice} choice @param {boolean} [persist] */
+function setViewport(choice, persist = true) {
+  viewport = choice;
+  const width = choice.width;
+  const label = width.kind === "preset" ? width.label : "";
+  el("preview-shell").style.width = width.kind === "pixels" ? width.value + "px" : allWidths.find((p) => p.label === label).w;
+  el("preview-shell").style.height = choice.height === null ? "100%" : choice.height + "px";
   setWidthActive(label);
-  updateWidthReadout();
+  updateSizeReadout();
   if (!persist) return;
   if (current) {
-    vwMem[current.story.id] = widthChoice;
+    vwMem[current.story.id] = choice;
     try { localStorage.setItem(VW_KEY, JSON.stringify(vwMem)); } catch {}
   }
   writeState();
@@ -441,7 +477,7 @@ function setWidth(choice, persist = true) {
 
 /** @param {keyof PanelVisibility} panel @param {boolean} visible @param {boolean} [persist] */
 function setPanelVisible(panel, visible, persist = true) {
-  finishWidthDrag(false);
+  finishResize(false);
   panels[panel] = visible;
   el(panel).hidden = !visible;
   document.body.classList.toggle("sidebar-hidden", !panels.sidebar);
@@ -451,26 +487,40 @@ function setPanelVisible(panel, visible, persist = true) {
   if (persist) {
     try { localStorage.setItem(PANELS_KEY, JSON.stringify(panels)); } catch {}
   }
-  updateWidthReadout();
+  updateSizeReadout();
 }
 
-function updateWidthReadout() {
-  const pixels = el("preview").clientWidth;
-  el("width-readout").textContent = pixels + "px";
-  el("resize-width").setAttribute("aria-valuemin", String(Math.min(MIN_WIDTH, pixels)));
-  el("resize-width").setAttribute("aria-valuemax", String(Math.max(MAX_WIDTH, pixels)));
-  el("resize-width").setAttribute("aria-valuenow", String(pixels));
-  el("resize-width").setAttribute("aria-valuetext", pixels + " pixels");
+function updateSizeReadout() {
+  const width = el("preview").clientWidth;
+  const height = el("preview").clientHeight;
+  el("width-readout").textContent = `${width} × ${height} px`;
+  el("fit-height").setAttribute("aria-pressed", String(viewport.height === null));
+  for (const handle of qsa(".resize-handle")) {
+    const direction = RESIZE_HANDLES[handle.dataset.edge];
+    if (direction.x && direction.y) {
+      handle.setAttribute("aria-label", `Resize preview ${direction.label}, ${width} by ${height} pixels`);
+      continue;
+    }
+    const pixels = direction.x ? width : height;
+    handle.setAttribute("aria-valuemin", String(Math.min(direction.x ? MIN_WIDTH : MIN_HEIGHT, pixels)));
+    handle.setAttribute("aria-valuemax", String(Math.max(direction.x ? MAX_WIDTH : MAX_HEIGHT, pixels)));
+    handle.setAttribute("aria-valuenow", String(pixels));
+    handle.setAttribute("aria-valuetext", pixels + " pixels");
+  }
 }
 
-function finishWidthDrag(commit) {
-  if (!widthDrag) return;
-  const drag = widthDrag;
-  widthDrag = null;
+function finishResize(commit) {
+  if (!resizeDrag) return;
+  const drag = resizeDrag;
+  resizeDrag = null;
   document.body.classList.remove("resizing-preview");
-  const handle = el("resize-width");
-  if (handle.hasPointerCapture(drag.pointerId)) handle.releasePointerCapture(drag.pointerId);
-  setWidth(commit ? widthChoice : drag.original, commit);
+  if (drag.handle.hasPointerCapture(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId);
+  setViewport(commit ? viewport : drag.original, commit);
+}
+
+function resizedAxis(size, available, delta, min, max) {
+  const edge = (size <= available ? (available + size) / 2 : size) + delta;
+  return Math.round(Math.max(min, Math.min(max, edge <= available ? 2 * edge - available : edge)));
 }
 
 function initWorkbench() {
@@ -478,37 +528,69 @@ function initWorkbench() {
     setPanelVisible(panel, panels[panel], false);
     el("toggle-" + panel).onclick = () => setPanelVisible(panel, !panels[panel]);
   }
-  const handle = el("resize-width");
-  handle.onpointerdown = (e) => {
-    if (e.button !== 0 || widthDrag) return;
-    e.preventDefault();
-    handle.focus();
-    widthDrag = { pointerId: e.pointerId, offset: e.clientX - el("preview-shell").getBoundingClientRect().right, scrollLeft: el("stage").scrollLeft, original: widthChoice };
-    handle.setPointerCapture(e.pointerId);
-    document.body.classList.add("resizing-preview");
+  el("fit-height").onclick = () => {
+    finishResize(false);
+    setViewport({ width: viewport.width, height: null });
   };
-  handle.onpointermove = (e) => {
-    if (!widthDrag || e.pointerId !== widthDrag.pointerId) return;
-    const stage = el("stage");
-    const style = getComputedStyle(stage);
-    const leftPadding = parseFloat(style.paddingLeft);
-    const available = stage.clientWidth - leftPadding - parseFloat(style.paddingRight);
-    const right = e.clientX - widthDrag.offset - stage.getBoundingClientRect().left - leftPadding + widthDrag.scrollLeft;
-    const pixels = right <= available ? 2 * right - available : right;
-    setWidth({ kind: "pixels", value: Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(pixels))) }, false);
-  };
-  handle.onpointerup = (e) => { if (widthDrag?.pointerId === e.pointerId) finishWidthDrag(true); };
-  handle.onpointercancel = () => finishWidthDrag(false);
-  handle.onlostpointercapture = () => finishWidthDrag(false);
-  handle.onkeydown = (e) => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    e.preventDefault();
-    finishWidthDrag(false);
-    const pixels = el("preview").clientWidth + (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 10 : 1);
-    setWidth({ kind: "pixels", value: Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, pixels)) });
-  };
-  if (typeof ResizeObserver !== "undefined") new ResizeObserver(updateWidthReadout).observe(el("preview"));
-  window.addEventListener("resize", () => { finishWidthDrag(false); updateWidthReadout(); });
+  for (const [edge, direction] of Object.entries(RESIZE_HANDLES)) {
+    const corner = !!(direction.x && direction.y);
+    const handle = document.createElement(corner ? "button" : "div");
+    handle.id = edge === "e" ? "resize-width" : "resize-" + edge;
+    handle.className = "resize-handle";
+    handle.dataset.edge = edge;
+    handle.tabIndex = 0;
+    handle.setAttribute("aria-label", "Resize preview " + direction.label);
+    handle.setAttribute("aria-controls", "preview");
+    handle.title = "Drag to resize. Arrow keys adjust by 1px; Shift adjusts by 10px. Escape cancels a drag.";
+    if (corner) handle.setAttribute("type", "button");
+    else {
+      handle.setAttribute("role", "separator");
+      handle.setAttribute("aria-orientation", direction.x ? "vertical" : "horizontal");
+    }
+    el("preview-shell").appendChild(handle);
+    handle.onpointerdown = (e) => {
+      if (e.button !== 0 || resizeDrag) return;
+      e.preventDefault();
+      handle.focus({ preventScroll: true });
+      const stage = el("stage");
+      const style = getComputedStyle(stage);
+      resizeDrag = {
+        pointerId: e.pointerId, handle, x: e.clientX, y: e.clientY,
+        width: el("preview").clientWidth, height: el("preview").clientHeight,
+        availableWidth: stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        availableHeight: stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom),
+        original: viewport,
+      };
+      handle.setPointerCapture(e.pointerId);
+      document.body.classList.add("resizing-preview");
+    };
+    handle.onpointermove = (e) => {
+      const drag = resizeDrag;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      setViewport({
+        width: direction.x ? { kind: "pixels", value: resizedAxis(drag.width, drag.availableWidth, (e.clientX - drag.x) * direction.x, MIN_WIDTH, MAX_WIDTH) } : drag.original.width,
+        height: direction.y ? resizedAxis(drag.height, drag.availableHeight, (e.clientY - drag.y) * direction.y, MIN_HEIGHT, MAX_HEIGHT) : drag.original.height,
+      }, false);
+    };
+    handle.onpointerup = (e) => { if (resizeDrag?.pointerId === e.pointerId) finishResize(true); };
+    handle.onpointercancel = () => finishResize(false);
+    handle.onlostpointercapture = () => finishResize(false);
+    handle.onkeydown = (e) => {
+      const dx = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      const dy = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+      if (!(dx && direction.x) && !(dy && direction.y)) return;
+      e.preventDefault();
+      finishResize(false);
+      const step = e.shiftKey ? 10 : 1;
+      setViewport({
+        width: dx && direction.x ? { kind: "pixels", value: Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, el("preview").clientWidth + dx * direction.x * step)) } : viewport.width,
+        height: dy && direction.y ? Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, el("preview").clientHeight + dy * direction.y * step)) : viewport.height,
+      });
+    };
+  }
+  updateSizeReadout();
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(updateSizeReadout).observe(el("preview"));
+  window.addEventListener("resize", () => { finishResize(false); updateSizeReadout(); });
 }
 // bgCanvas maps a bg choice to the canvas (#stage) backdrop. dark is kept
 // distinct from the preview surface so a resized preview stays visible on it.
@@ -518,6 +600,7 @@ function bgCanvas(label) {
   return "#0b0c10"; // dark
 }
 function setBg(label) {
+  finishResize(false);
   bg = label;
   setBgActive(label);
   el("stage").style.background = bgCanvas(label);
@@ -538,8 +621,9 @@ function stateString() {
     for (const [k, v] of Object.entries(args)) if (v != null && v !== "") p.set("arg." + k, v);
   }
   p.set("mode", mode);
-  if (widthChoice.kind === "preset") p.set("w", widthChoice.label);
-  else p.set("px", String(widthChoice.value));
+  if (viewport.width.kind === "preset") p.set("w", viewport.width.label);
+  else p.set("px", String(viewport.width.value));
+  if (viewport.height !== null) p.set("h", String(viewport.height));
   p.set("bg", bg);
   return p.toString();
 }
@@ -549,6 +633,7 @@ function writeState() {
   try { localStorage.setItem("swapbook:last", s); } catch {}
 }
 function applyParams(str) {
+  finishResize(false);
   if (!str) return false;
   const p = new URLSearchParams(str);
   const story = allStories.find((s) => s.id === p.get("story"));
@@ -567,9 +652,11 @@ function applyParams(str) {
   }
   const stateArgs = {};
   for (const [k, val] of p) if (k.startsWith("arg.")) stateArgs[k.slice(4)] = val;
-  // Pass the URL width down so the whole precedence rule (URL > remembered >
-  // full) lives in selectVariant; a shared link never mutates local memory.
-  selectVariant(story, v, stateArgs, urlW);
+  const rawHeight = p.get("h");
+  const height = rawHeight && /^\d+$/.test(rawHeight) ? parseHeight(Number(rawHeight)) : null;
+  const remembered = parseViewport(vwMem[story.id]);
+  const size = urlW || p.has("h") ? { width: urlW || remembered?.width || { kind: "preset", label: "full" }, height } : null;
+  selectVariant(story, v, stateArgs, size);
   return true;
 }
 
@@ -856,10 +943,10 @@ document.addEventListener("keydown", (e) => {
   const active = /** @type {HTMLElement} */ (document.activeElement);
   const tag = active && active.tagName;
   const typing = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
-  if (e.key === "Escape" && widthDrag) { e.preventDefault(); finishWidthDrag(false); return; }
+  if (e.key === "Escape" && resizeDrag) { e.preventDefault(); finishResize(false); return; }
   if (e.key === "Escape" && typing) return active.blur();
   if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (widthDrag && (["j", "k", "m"].includes(e.key) || (e.key >= "1" && e.key <= "9"))) finishWidthDrag(false);
+  if (resizeDrag && (["j", "k", "m"].includes(e.key) || (e.key >= "1" && e.key <= "9"))) finishResize(false);
   if (e.key === "/") { e.preventDefault(); setPanelVisible("sidebar", true); return el("story-search").focus(); }
   if (e.key === "j") { e.preventDefault(); return moveStory(1); }
   if (e.key === "k") { e.preventDefault(); return moveStory(-1); }

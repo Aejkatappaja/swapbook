@@ -71,12 +71,17 @@ Use **hide stories** or **hide inspector** in the toolbar to give the preview mo
 space. The buttons stay visible so you can reopen either panel. Panel visibility
 is remembered on this browser. Press `/` to reopen the sidebar and search.
 
-Drag the grip on the preview's right edge to set a width between 240 and 3840
-pixels. The toolbar reports the preview's actual viewport width. Focus the grip
-and use the arrow keys for 1-pixel changes, or Shift with an arrow key for
-10-pixel changes. Press Escape during a drag to cancel it. Presets remain
-shortcuts, and **full** follows the available space. Custom widths are remembered
-per story and included in shared links. Resizing keeps the current preview loaded.
+Drag any edge of the preview to change its width or height. Drag a corner to
+change both. The preview stays centered while it fits, and oversized dimensions
+scroll from the top-left. The toolbar reports the actual width × height in pixels.
+Manual widths range from 240 to 3840 pixels, and heights from 160 to 2160 pixels.
+
+Focus a handle and use the arrow keys to change that dimension by one pixel, or hold
+Shift for ten pixels. Corner handles support both axes. Press Escape during a
+drag to restore both dimensions. Width presets preserve the selected height.
+Use **fit height** to fill the available height again; **full** fills the available
+width. Both dimensions are remembered per story and included in shared links.
+Resizing keeps the current preview loaded.
 
 ## How it works
 
