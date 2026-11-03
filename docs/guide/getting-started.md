@@ -67,6 +67,8 @@ Any viewports set via `reg.Viewports` appear in the toolbar's width bar next to
 the built-ins; the width you pick is remembered per story. Other stacks emit the
 same `viewports` list in their manifest.
 
+Click a group heading to collapse or expand its stories. Collapsed groups are remembered in this browser; filtering temporarily reveals matching groups.
+
 Use **hide stories** in the sidebar to give the preview more space. When the
 sidebar is collapsed, a slim rail keeps the logo, a **show stories** button, and the current position within the visible story entries. Use **hide inspector**
 beside **clear** in the bottom panel to collapse its content. The collapsed inspector keeps its

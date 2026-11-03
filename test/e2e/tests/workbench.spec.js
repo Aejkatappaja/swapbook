@@ -372,3 +372,40 @@ test("collapsed sidebar rail keeps branding, position, and keyboard reopening", 
   await expect(hide).toBeVisible();
   await expect(show).toBeHidden();
 });
+
+test("story groups collapse independently, persist, and reveal search matches", async ({ page }) => {
+  await page.route("**/__sb/api/manifest", async (route) => {
+    const manifest = await (await route.fetch()).json();
+    manifest.stories.forEach((story) => { story.group = story.id === "play" ? "Interaction" : "Other"; });
+    await route.fulfill({ json: manifest });
+  });
+  await start(page);
+  const group = page.getByRole("button", { name: "Interaction", exact: true });
+  const content = page.locator(".group-items").filter({ has: page.locator('[data-sid="play"]') });
+  const other = page.getByRole("button", { name: "Other", exact: true });
+  await group.focus();
+  await page.keyboard.press("Enter");
+  await expect(group).toHaveAttribute("aria-expanded", "false");
+  await expect(content).toBeHidden();
+  await expect(other).toHaveAttribute("aria-expanded", "true");
+  await expect(page.frameLocator("#preview").locator("#go")).toBeVisible();
+  await page.reload();
+  await expect(group).toHaveAttribute("aria-expanded", "false");
+  await expect(content).toBeHidden();
+  await page.locator("#story-search").fill("play");
+  await expect(group).toHaveAttribute("aria-expanded", "true");
+  await expect(content).toBeVisible();
+  await page.locator("#story-search").fill("");
+  await expect(group).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: "hide stories", exact: true }).click();
+  const count = await page.locator("#stories .story").evaluateAll((items) => items.filter((item) => !item.closest(".group-items[hidden]")).length);
+  await expect(page.locator("#story-position")).toHaveText(`–/${count}`);
+  await page.getByRole("button", { name: "show stories", exact: true }).click();
+  await group.click();
+  await expect(content).toBeVisible();
+  await page.reload();
+  await expect(group).toHaveAttribute("aria-expanded", "true");
+  await group.click();
+  await page.keyboard.press("j");
+  await expect(page.locator("#stories .story.active")).not.toHaveAttribute("data-sid", "play");
+});

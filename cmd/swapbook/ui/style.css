@@ -98,10 +98,14 @@ body::after {
   border-bottom: 1px solid var(--border); margin-bottom: 8px;
 }
 #stories { display: flex; flex-direction: column; padding: 4px 8px; gap: 1px; flex: 1; }
+.group-items { display: flex; flex-direction: column; gap: 1px; }
 .group {
+  background: none; border: 0; font-family: inherit; text-align: left; cursor: pointer;
   color: var(--purple); font-size: 11px; padding: 12px 8px 4px; letter-spacing: .3px;
 }
-.group::before { content: "// "; color: var(--comment); }
+.group::before { content: "▾ "; color: var(--comment); }
+.group[aria-expanded="false"]::before { content: "▸ "; }
+.group:hover { color: var(--fg-bright); }
 .story {
   position: relative; text-align: left; background: none; border: 0;
   color: var(--fg-dim); font: inherit; padding: 6px 8px 6px 20px;

@@ -66,6 +66,15 @@ try {
   const parsed = JSON.parse(localStorage.getItem(VW_KEY) || "{}");
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) vwMem = parsed;
 } catch {}
+const GROUPS_KEY = "swapbook:collapsed-groups";
+/** @type {Set<string>} */
+const collapsedGroups = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(GROUPS_KEY) || "[]");
+  if (Array.isArray(saved)) for (const name of saved) {
+    if (typeof name === "string") collapsedGroups.add(name);
+  }
+} catch {}
 const PANELS_KEY = "swapbook:panels";
 /** @type {PanelVisibility} */
 const panels = { sidebar: true, inspector: true };
@@ -149,16 +158,33 @@ async function boot() {
 }
 
 function renderStories(stories) {
-  const groups = {};
+  const groups = Object.create(null);
   for (const s of stories) (groups[s.group || ""] ??= []).push(s);
   const nav = el("stories");
   nav.innerHTML = "";
   for (const [group, items] of Object.entries(groups)) {
+    let container = nav;
     if (group) {
-      const h = document.createElement("div");
+      const h = document.createElement("button");
+      h.type = "button";
       h.className = "group";
       h.textContent = group;
-      nav.appendChild(h);
+      h.setAttribute("aria-label", group);
+      container = document.createElement("div");
+      container.className = "group-items";
+      container.id = "story-group-" + nav.childElementCount;
+      container.hidden = collapsedGroups.has(group) && !el("story-search").value.trim();
+      h.setAttribute("aria-controls", container.id);
+      h.setAttribute("aria-expanded", String(!container.hidden));
+      h.onclick = () => {
+        container.hidden = !container.hidden;
+        h.setAttribute("aria-expanded", String(!container.hidden));
+        if (container.hidden) collapsedGroups.add(group);
+        else collapsedGroups.delete(group);
+        try { localStorage.setItem(GROUPS_KEY, JSON.stringify([...collapsedGroups])); } catch {}
+        setActiveStory();
+      };
+      nav.append(h, container);
     }
     for (const s of items) {
       const d = document.createElement("button");
@@ -167,7 +193,7 @@ function renderStories(stories) {
       d.dataset.docs = "1";
       d.innerHTML = `<span class="knob">▤</span> ${esc(s.name)} · docs`;
       d.onclick = () => selectDocs(s);
-      nav.appendChild(d);
+      container.appendChild(d);
       for (const v of s.variants) {
         const name = vName(v);
         const a = document.createElement("button");
@@ -176,11 +202,15 @@ function renderStories(stories) {
         a.dataset.vname = name;
         a.innerHTML = `${esc(s.name)} · ${esc(name)}${vControls(v).length ? ' <span class="knob">◧</span>' : ""}`;
         a.onclick = () => selectVariant(s, v);
-        nav.appendChild(a);
+        container.appendChild(a);
       }
     }
   }
   setActiveStory();
+}
+
+function visibleStoryEntries() {
+  return qsa("#stories .story").filter((b) => !b.closest(".group-items[hidden]"));
 }
 
 function setActiveStory() {
@@ -191,7 +221,7 @@ function setActiveStory() {
     b.classList.toggle("active", !!on);
     if (on) b.scrollIntoView({ block: "nearest" });
   });
-  const entries = qsa("#stories .story");
+  const entries = visibleStoryEntries();
   const position = entries.findIndex((b) => b.classList.contains("active")) + 1;
   const indicator = el("story-position");
   indicator.textContent = `${position || "–"}/${entries.length}`;
@@ -952,7 +982,7 @@ copyLinkBtn.onclick = () => copyToClipboard(copyLinkBtn, location.href, "link �
 el("story-search").oninput = debounce(() => renderStories(currentStoryList()), 120);
 
 function moveStory(dir) {
-  const btns = [...qsa(".story")];
+  const btns = visibleStoryEntries();
   if (!btns.length) return;
   let i = btns.findIndex((b) => b.classList.contains("active"));
   i = i < 0 ? (dir > 0 ? 0 : btns.length - 1) : (i + dir + btns.length) % btns.length;
