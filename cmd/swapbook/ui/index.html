@@ -12,7 +12,7 @@
 <div class="glow glow-2"></div>
 
 <aside id="sidebar">
-  <div class="brand">
+  <div class="brand" title="Swapbook">
     <svg class="brand-mark" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
       <rect width="32" height="32" rx="8" fill="#14161c"/>
       <path d="M8 13 H21" stroke="#82c9e0" stroke-width="3.2" stroke-linecap="round"/>
@@ -23,6 +23,9 @@
     <span class="brand-wm">~<span class="slash">/</span>swapbook</span>
   </div>
   <div class="brand-sub">// component workbench</div>
+  <button id="toggle-sidebar" aria-controls="sidebar" aria-expanded="true">hide stories <span aria-hidden="true">‹</span></button>
+  <button id="show-sidebar" aria-label="show stories" title="Show stories" aria-controls="stories" aria-expanded="false" hidden>›</button>
+  <output id="story-position" hidden aria-live="polite"></output>
   <input id="story-search" type="search" placeholder="filter stories…" autocomplete="off" spellcheck="false">
   <nav id="stories">loading…</nav>
   <div class="side-foot" id="status"><span class="dot ok">●</span> <span class="status-txt">ready</span></div>
@@ -33,7 +36,7 @@
     <span id="current"><span class="p">$</span> select a story</span>
     <div class="tools">
       <div class="seg"><span class="seg-label">mode</span><div class="modes" id="modes"></div></div>
-      <div class="seg"><span class="seg-label">width</span><div class="widths" id="widths"></div></div>
+      <div class="seg"><span class="seg-label">width</span><div class="widths" id="widths"></div><output id="width-readout" aria-label="Preview dimensions"></output><button id="fit-height" title="Fill the available preview height" aria-pressed="true">fit height</button></div>
       <div class="seg"><span class="seg-label">bg</span><div class="bgs" id="bgs"></div></div>
       <button id="copy-link" title="copy a shareable link to this state">link ⧉</button>
       <button id="open-tab" title="open preview in a new tab">open ↗</button>
@@ -43,7 +46,9 @@
   <div id="controls" hidden></div>
 
   <div id="stage">
-    <iframe id="preview" title="preview"></iframe>
+    <div id="preview-shell">
+      <iframe id="preview" title="preview"></iframe>
+    </div>
     <div id="autodocs" class="autodocs" hidden></div>
     <div id="stage-error" hidden>
       <div class="err-mark">✕</div>
@@ -61,6 +66,7 @@
       </div>
       <button id="run-play" hidden>▶ play</button>
       <button id="clear">clear</button>
+      <button id="toggle-inspector" aria-controls="inspector" aria-expanded="true">hide inspector</button>
     </div>
     <ol id="events" class="panel"></ol>
     <ul id="a11y" class="panel" hidden></ul>

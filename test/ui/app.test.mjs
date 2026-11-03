@@ -65,7 +65,7 @@ const MANIFEST_VW = JSON.stringify({
     { id: "todo-list", name: "Todo list", variants: [{ name: "default" }] },
   ],
 });
-const widthOf = (w) => w.document.getElementById("preview").style.width;
+const widthOf = (w) => w.document.getElementById("preview-shell").style.width;
 
 test("project viewports extend the built-in width buttons", async () => {
   const w = await boot(
@@ -143,4 +143,37 @@ test("a list in htmxSrc collapses to its first entry", async () => {
     "story=button&variant=primary",
   );
   assert.deepEqual(frameQuery(w).getAll("htmx"), ["/static/htmx.js"]);
+});
+
+test("invalid pixel links fall back to the selected preset or story memory", async () => {
+  const w = await boot(async () => res(200, MANIFEST_VW), (w) => txt(w, "stories").includes("Button"));
+  w.applyParams("story=button&variant=primary&w=phone&px=1000000");
+  assert.equal(widthOf(w), "375px");
+  for (const px of ["NaN", "400.5", "1e3", "-10", "0", "239", "3841"]) {
+    w.applyParams("story=button&variant=primary&w=tablet&px=" + px);
+    assert.equal(widthOf(w), "768px");
+  }
+});
+
+test("viewport links accept height and retain legacy width state", async () => {
+  const w = await boot(async () => res(200, MANIFEST_VW), (w) => txt(w, "stories").includes("Button"));
+  const shell = w.document.getElementById("preview-shell");
+  w.applyParams("story=button&variant=primary&px=640&h=480");
+  assert.equal(widthOf(w), "640px");
+  assert.equal(shell.style.height, "480px");
+  for (const h of ["NaN", "400.5", "1e3", "-10", "0", "159", "2161"]) {
+    w.applyParams("story=button&variant=primary&w=tablet&h=" + h);
+    assert.equal(widthOf(w), "768px");
+    assert.equal(shell.style.height, "100%");
+  }
+  w.applyParams("story=button&variant=primary&w=phone");
+  assert.equal(shell.style.height, "100%");
+  w.setWidth("phone");
+  w.applyParams("story=button&variant=primary&h=350");
+  assert.equal(widthOf(w), "375px");
+  assert.equal(shell.style.height, "350px");
+  w.setWidth("phone");
+  w.applyParams("story=button&variant=primary&h=NaN");
+  assert.equal(widthOf(w), "375px");
+  assert.equal(shell.style.height, "100%");
 });

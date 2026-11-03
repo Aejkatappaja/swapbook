@@ -10,6 +10,10 @@
  * @typedef {string | VariantObj} Variant  variants may be a bare name (hand-rolled targets) or an object
  * @typedef {{ id: string, name: string, group?: string, docs?: string, variants: Variant[] }} Story
  * @typedef {{ name: string, w: string }} Viewport  a project-declared preview width
+ * @typedef {{ kind: "preset", label: string } | { kind: "pixels", value: number }} WidthChoice
+ * @typedef {{ width: WidthChoice, height: number | null }} ViewportChoice
+ * @typedef {{ x: -1 | 0 | 1, y: -1 | 0 | 1, label: string }} ResizeDirection
+ * @typedef {{ sidebar: boolean, inspector: boolean }} PanelVisibility
  * @typedef {string | string[]} Srcs one asset path, or several in load order
  * @typedef {{ htmxSrc?: string, cssSrc?: Srcs, jsSrc?: Srcs, stories?: Story[], viewports?: Viewport[] }} Manifest
  * @typedef {{ source: string, seq?: number, event: string, data?: any }} SBMessage  posted by the frame's inspector
@@ -25,6 +29,17 @@ const WIDTHS = [
 let allWidths = WIDTHS.slice();
 /** @param {unknown} label @returns {boolean} is this a known viewport label */
 const hasWidth = (label) => allWidths.some((w) => w.label === label);
+const MIN_WIDTH = 240;
+const MAX_WIDTH = 3840;
+const MIN_HEIGHT = 160;
+const MAX_HEIGHT = 2160;
+/** @type {Record<string, ResizeDirection>} */
+const RESIZE_HANDLES = {
+  n: { x: 0, y: -1, label: "top" }, ne: { x: 1, y: -1, label: "top right" },
+  e: { x: 1, y: 0, label: "right" }, se: { x: 1, y: 1, label: "bottom right" },
+  s: { x: 0, y: 1, label: "bottom" }, sw: { x: -1, y: 1, label: "bottom left" },
+  w: { x: -1, y: 0, label: "left" }, nw: { x: -1, y: -1, label: "top left" },
+};
 const MODES = ["mock", "safe", "live"];
 const MODE_TITLES = {
   mock: "mocked routes served locally, unmocked writes blocked",
@@ -38,17 +53,48 @@ let htmxSrc = "";
 /** @type {string[]} */ let cssSrcs = [];
 /** @type {string[]} */ let jsSrcs = [];
 let mode = "mock";
-let widthLabel = "full";
-let bg = localStorage.getItem("swapbook:bg") || "dark";
+/** @type {ViewportChoice} */
+let viewport = { width: { kind: "preset", label: "full" }, height: null };
+let bg = "dark";
+try { bg = localStorage.getItem("swapbook:bg") || bg; } catch {}
 // Per-story viewport memory: switching to a story restores the width last used
 // for it. An explicit URL "w" still wins, so shared links stay exact.
 const VW_KEY = "swapbook:viewports";
-/** @type {Record<string, string>} storyId -> viewport label */
+/** @type {Record<string, unknown>} storyId -> saved width choice */
 let vwMem = {};
 try {
   const parsed = JSON.parse(localStorage.getItem(VW_KEY) || "{}");
-  if (parsed && typeof parsed === "object") vwMem = parsed;
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) vwMem = parsed;
 } catch {}
+const GROUPS_KEY = "swapbook:collapsed-groups";
+/** @type {Set<string>} */
+const collapsedGroups = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(GROUPS_KEY) || "[]");
+  if (Array.isArray(saved)) for (const name of saved) {
+    if (typeof name === "string") collapsedGroups.add(name);
+  }
+} catch {}
+const COMPONENTS_KEY = "swapbook:collapsed-components";
+/** @type {Set<string>} */
+const collapsedComponents = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(COMPONENTS_KEY) || "[]");
+  if (Array.isArray(saved)) for (const id of saved) {
+    if (typeof id === "string") collapsedComponents.add(id);
+  }
+} catch {}
+const PANELS_KEY = "swapbook:panels";
+/** @type {PanelVisibility} */
+const panels = { sidebar: true, inspector: true };
+try {
+  const saved = JSON.parse(localStorage.getItem(PANELS_KEY) || "{}");
+  for (const panel of ["sidebar", "inspector"]) {
+    if (typeof saved?.[panel] === "boolean") panels[panel] = saved[panel];
+  }
+} catch {}
+/** @type {{ pointerId: number, handle: HTMLElement, x: number, y: number, width: number, height: number, availableWidth: number, availableHeight: number, original: ViewportChoice } | null} */
+let resizeDrag = null;
 /** @type {Story[]} */ let allStories = [];
 /** @type {{ story: Story, variant: Variant } | null} */ let current = null;
 /** @type {Record<string, any>} */ let args = {};
@@ -70,6 +116,7 @@ const el = (id) => document.getElementById(id);
 // asset paths + stories it carries. Shared by boot and poll so a rebuild that
 // changes hashed asset URLs is picked up, not just the story list.
 function applyManifest(text) {
+  finishResize(false);
   manifestRaw = text;
   const m = JSON.parse(text);
   htmxSrc = srcList(m.htmxSrc)[0] || ""; // a document runs one htmx, so take the first
@@ -85,6 +132,7 @@ function applyManifest(text) {
     }
   }
   renderWidths(); // the manifest may add viewports, so rebuild the width bar
+  if (!parseWidth(viewport.width)) setViewport({ width: { kind: "preset", label: "full" }, height: viewport.height }, false);
 }
 
 // fetchManifest classifies the target: "ok" (adapter answered with a manifest),
@@ -103,6 +151,7 @@ async function fetchManifest() {
 
 async function boot() {
   renderBars();
+  initWorkbench();
   el("run-play").onclick = runPlay;
   const m = await fetchManifest();
   if (m.state === "ok") {
@@ -118,41 +167,84 @@ async function boot() {
 }
 
 function renderStories(stories) {
-  const groups = {};
+  const groups = Object.create(null);
   for (const s of stories) (groups[s.group || ""] ??= []).push(s);
   const nav = el("stories");
   nav.innerHTML = "";
   for (const [group, items] of Object.entries(groups)) {
+    let container = nav;
     if (group) {
-      const h = document.createElement("div");
+      const h = document.createElement("button");
+      h.type = "button";
       h.className = "group";
       h.textContent = group;
-      nav.appendChild(h);
+      h.setAttribute("aria-label", group);
+      container = document.createElement("div");
+      container.className = "group-items";
+      container.id = "story-group-" + nav.childElementCount;
+      container.hidden = collapsedGroups.has(group) && !el("story-search").value.trim();
+      h.setAttribute("aria-controls", container.id);
+      h.setAttribute("aria-expanded", String(!container.hidden));
+      h.onclick = () => {
+        container.hidden = !container.hidden;
+        h.setAttribute("aria-expanded", String(!container.hidden));
+        if (container.hidden) collapsedGroups.add(group);
+        else collapsedGroups.delete(group);
+        try { localStorage.setItem(GROUPS_KEY, JSON.stringify([...collapsedGroups])); } catch {}
+        setActiveStory();
+      };
+      nav.append(h, container);
     }
     for (const s of items) {
+      const heading = document.createElement("button");
+      heading.type = "button";
+      heading.className = "component-heading";
+      heading.textContent = s.name;
+      heading.dataset.sid = s.id;
+      heading.setAttribute("aria-label", s.name);
+      const children = document.createElement("div");
+      children.className = "component-items";
+      children.id = "story-component-" + nav.querySelectorAll(".component-heading").length;
+      children.hidden = collapsedComponents.has(s.id) && !el("story-search").value.trim();
+      heading.setAttribute("aria-controls", children.id);
+      heading.setAttribute("aria-expanded", String(!children.hidden));
+      heading.onclick = () => {
+        children.hidden = !children.hidden;
+        heading.setAttribute("aria-expanded", String(!children.hidden));
+        if (children.hidden) collapsedComponents.add(s.id);
+        else collapsedComponents.delete(s.id);
+        try { localStorage.setItem(COMPONENTS_KEY, JSON.stringify([...collapsedComponents])); } catch {}
+        setActiveStory();
+      };
+      container.append(heading, children);
       const d = document.createElement("button");
       d.className = "story story-docs";
       d.dataset.sid = s.id;
       d.dataset.docs = "1";
-      d.innerHTML = `<span class="knob">▤</span> ${esc(s.name)} · docs`;
+      d.innerHTML = `<span class="knob" aria-hidden="true">▤</span> docs`;
       d.onclick = () => selectDocs(s);
-      nav.appendChild(d);
+      children.appendChild(d);
       for (const v of s.variants) {
         const name = vName(v);
         const a = document.createElement("button");
         a.className = "story";
         a.dataset.sid = s.id;
         a.dataset.vname = name;
-        a.innerHTML = `${esc(s.name)} · ${esc(name)}${vControls(v).length ? ' <span class="knob">◧</span>' : ""}`;
+        a.innerHTML = `${esc(name)}${vControls(v).length ? ' <span class="knob">◧</span>' : ""}`;
         a.onclick = () => selectVariant(s, v);
-        nav.appendChild(a);
+        children.appendChild(a);
       }
     }
   }
   setActiveStory();
 }
 
+function visibleStoryEntries() {
+  return qsa("#stories .story").filter((b) => !b.closest(".group-items[hidden], .component-items[hidden]"));
+}
+
 function setActiveStory() {
+  qsa(".component-heading").forEach((b) => b.classList.toggle("active", !!current && b.dataset.sid === current.story.id));
   qsa(".story").forEach((b) => {
     const isDocs = b.dataset.docs === "1";
     const on = current && b.dataset.sid === current.story.id &&
@@ -160,18 +252,33 @@ function setActiveStory() {
     b.classList.toggle("active", !!on);
     if (on) b.scrollIntoView({ block: "nearest" });
   });
+  const entries = visibleStoryEntries();
+  const position = entries.findIndex((b) => b.classList.contains("active")) + 1;
+  const indicator = el("story-position");
+  indicator.textContent = `${position || "–"}/${entries.length}`;
+  const description = position
+    ? `Item ${position} of ${entries.length} visible story entries`
+    : `${entries.length} visible story entries; current selection is not in the list`;
+  indicator.setAttribute("aria-label", description);
+  indicator.title = description;
 }
 
 function showPreview() {
-  el("preview").hidden = false;
+  el("preview-shell").hidden = false;
+  el("width-readout").hidden = false;
+  el("fit-height").hidden = false;
   el("autodocs").hidden = true;
 }
 function showAutodocs() {
-  el("preview").hidden = true;
+  finishResize(false);
+  el("preview-shell").hidden = true;
+  el("width-readout").hidden = true;
+  el("fit-height").hidden = true;
   el("autodocs").hidden = false;
 }
 
-function selectVariant(story, v, stateArgs, width) {
+function selectVariant(story, v, stateArgs, size) {
+  finishResize(false);
   docsView = false;
   showPreview();
   current = { story, variant: v };
@@ -182,15 +289,13 @@ function selectVariant(story, v, stateArgs, width) {
   renderControls(vControls(v));
   renderDocs(vDocs(v));
   el("run-play").hidden = vPlay(v).length === 0;
-  // Resolve the viewport once: an explicit width (from the URL) wins, else the
-  // one last used for this story, else full. Applied without persisting, since
-  // only a deliberate pick should write the story's remembered width.
-  setWidth(width || (hasWidth(vwMem[story.id]) ? vwMem[story.id] : "full"), false);
+  setViewport(size || parseViewport(vwMem[story.id]) || { width: { kind: "preset", label: "full" }, height: null }, false);
   loadFrame();
   writeState();
 }
 
 function selectDocs(story) {
+  finishResize(false);
   docsView = true;
   current = { story, variant: story.variants[0] };
   args = {};
@@ -374,7 +479,7 @@ function segmented(containerId, values, onpick, title) {
 // (which may add project viewports) can refresh it without touching mode/bg.
 function renderWidths() {
   setWidthActive = segmented("widths", allWidths.map((w) => w.label), setWidth);
-  setWidthActive(widthLabel);
+  setWidthActive(viewport.width.kind === "preset" ? viewport.width.label : "");
 }
 function renderBars() {
   setModeActive = segmented("modes", MODES, setMode, (v) => MODE_TITLES[v] || "");
@@ -385,25 +490,187 @@ function renderBars() {
   el("stage").style.background = bgCanvas(bg);
 }
 function setMode(m) {
+  finishResize(false);
   mode = m;
   setModeActive(m);
   loadFrame();
   writeState();
 }
-// setWidth applies a viewport. persist=false is used for per-story recall (the
-// caller writes state itself); a deliberate pick (button/keyboard) persists the
-// story's remembered width and writes state here.
-function setWidth(label, persist = true) {
-  const p = allWidths.find((x) => x.label === label) || allWidths[0];
-  widthLabel = p.label;
-  el("preview").style.width = p.w;
-  setWidthActive(p.label);
+/** @param {unknown} value @returns {WidthChoice | null} */
+function parseWidth(value) {
+  if (typeof value === "string") return hasWidth(value) ? { kind: "preset", label: value } : null;
+  if (!value || typeof value !== "object") return null;
+  if ("kind" in value && value.kind === "preset" && "label" in value && typeof value.label === "string") {
+    return parseWidth(value.label);
+  }
+  if ("kind" in value && value.kind === "pixels" && "value" in value && typeof value.value === "number" &&
+      Number.isInteger(value.value) && value.value >= MIN_WIDTH && value.value <= MAX_WIDTH) {
+    return { kind: "pixels", value: value.value };
+  }
+  return null;
+}
+/** @param {unknown} value @returns {number | null} */
+function parseHeight(value) {
+  return typeof value === "number" && Number.isInteger(value) && value >= MIN_HEIGHT && value <= MAX_HEIGHT ? value : null;
+}
+/** @param {unknown} value @returns {ViewportChoice | null} */
+function parseViewport(value) {
+  if (value && typeof value === "object" && "width" in value) {
+    const width = parseWidth(value.width);
+    const height = "height" in value ? parseHeight(value.height) : null;
+    return width || height !== null ? { width: width || { kind: "preset", label: "full" }, height } : null;
+  }
+  const width = parseWidth(value);
+  return width ? { width, height: null } : null;
+}
+/** @param {string | WidthChoice} choice @param {boolean} [persist] */
+function setWidth(choice, persist = true) {
+  finishResize(false);
+  setViewport({ width: parseWidth(choice) || { kind: "preset", label: "full" }, height: viewport.height }, persist);
+}
+/** @param {ViewportChoice} choice @param {boolean} [persist] */
+function setViewport(choice, persist = true) {
+  viewport = choice;
+  const width = choice.width;
+  const label = width.kind === "preset" ? width.label : "";
+  el("preview-shell").style.width = width.kind === "pixels" ? width.value + "px" : allWidths.find((p) => p.label === label).w;
+  el("preview-shell").style.height = choice.height === null ? "100%" : choice.height + "px";
+  setWidthActive(label);
+  updateSizeReadout();
   if (!persist) return;
   if (current) {
-    vwMem[current.story.id] = p.label;
+    vwMem[current.story.id] = choice;
     try { localStorage.setItem(VW_KEY, JSON.stringify(vwMem)); } catch {}
   }
   writeState();
+}
+
+/** @param {keyof PanelVisibility} panel @param {boolean} visible @param {boolean} [persist] */
+function setPanelVisible(panel, visible, persist = true) {
+  finishResize(false);
+  const button = el("toggle-" + panel);
+  const hadFocus = document.activeElement === button || (panel === "sidebar" && document.activeElement === el("show-sidebar"));
+  panels[panel] = visible;
+  el(panel).classList.toggle("collapsed", !visible);
+  document.body.classList.toggle("sidebar-hidden", !panels.sidebar);
+  if (panel === "sidebar") {
+    const reopen = el("show-sidebar");
+    button.hidden = !visible;
+    reopen.hidden = visible;
+    el("story-position").hidden = visible;
+    reopen.setAttribute("aria-expanded", String(visible));
+    if (hadFocus) (visible ? button : reopen).focus();
+    if (visible) setActiveStory();
+  } else button.textContent = (visible ? "hide " : "show ") + "inspector";
+  button.setAttribute("aria-expanded", String(visible));
+  if (persist) {
+    try { localStorage.setItem(PANELS_KEY, JSON.stringify(panels)); } catch {}
+  }
+  updateSizeReadout();
+}
+
+function updateSizeReadout() {
+  const width = el("preview").clientWidth;
+  const height = el("preview").clientHeight;
+  el("width-readout").textContent = `${width} × ${height} px`;
+  el("fit-height").setAttribute("aria-pressed", String(viewport.height === null));
+  for (const handle of qsa(".resize-handle")) {
+    const direction = RESIZE_HANDLES[handle.dataset.edge];
+    if (direction.x && direction.y) {
+      handle.setAttribute("aria-label", `Resize preview ${direction.label}, ${width} by ${height} pixels`);
+      continue;
+    }
+    const pixels = direction.x ? width : height;
+    handle.setAttribute("aria-valuemin", String(Math.min(direction.x ? MIN_WIDTH : MIN_HEIGHT, pixels)));
+    handle.setAttribute("aria-valuemax", String(Math.max(direction.x ? MAX_WIDTH : MAX_HEIGHT, pixels)));
+    handle.setAttribute("aria-valuenow", String(pixels));
+    handle.setAttribute("aria-valuetext", pixels + " pixels");
+  }
+}
+
+function finishResize(commit) {
+  if (!resizeDrag) return;
+  const drag = resizeDrag;
+  resizeDrag = null;
+  document.body.classList.remove("resizing-preview");
+  if (drag.handle.hasPointerCapture(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId);
+  setViewport(commit ? viewport : drag.original, commit);
+}
+
+function resizedAxis(size, available, delta, min, max) {
+  const edge = (size <= available ? (available + size) / 2 : size) + delta;
+  return Math.round(Math.max(min, Math.min(max, edge <= available ? 2 * edge - available : edge)));
+}
+
+function initWorkbench() {
+  for (const panel of /** @type {(keyof PanelVisibility)[]} */ (["sidebar", "inspector"])) {
+    setPanelVisible(panel, panels[panel], false);
+    el("toggle-" + panel).onclick = () => setPanelVisible(panel, !panels[panel]);
+  }
+  el("show-sidebar").onclick = () => setPanelVisible("sidebar", true);
+  el("fit-height").onclick = () => {
+    finishResize(false);
+    setViewport({ width: viewport.width, height: null });
+  };
+  for (const [edge, direction] of Object.entries(RESIZE_HANDLES)) {
+    const corner = !!(direction.x && direction.y);
+    const handle = document.createElement(corner ? "button" : "div");
+    handle.id = edge === "e" ? "resize-width" : "resize-" + edge;
+    handle.className = "resize-handle";
+    handle.dataset.edge = edge;
+    handle.tabIndex = 0;
+    handle.setAttribute("aria-label", "Resize preview " + direction.label);
+    handle.setAttribute("aria-controls", "preview");
+    handle.title = "Drag to resize. Arrow keys adjust by 1px; Shift adjusts by 10px. Escape cancels a drag.";
+    if (corner) handle.setAttribute("type", "button");
+    else {
+      handle.setAttribute("role", "separator");
+      handle.setAttribute("aria-orientation", direction.x ? "vertical" : "horizontal");
+    }
+    el("preview-shell").appendChild(handle);
+    handle.onpointerdown = (e) => {
+      if (e.button !== 0 || resizeDrag) return;
+      e.preventDefault();
+      handle.focus({ preventScroll: true });
+      const stage = el("stage");
+      const style = getComputedStyle(stage);
+      resizeDrag = {
+        pointerId: e.pointerId, handle, x: e.clientX, y: e.clientY,
+        width: el("preview").clientWidth, height: el("preview").clientHeight,
+        availableWidth: stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        availableHeight: stage.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom),
+        original: viewport,
+      };
+      handle.setPointerCapture(e.pointerId);
+      document.body.classList.add("resizing-preview");
+    };
+    handle.onpointermove = (e) => {
+      const drag = resizeDrag;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      setViewport({
+        width: direction.x ? { kind: "pixels", value: resizedAxis(drag.width, drag.availableWidth, (e.clientX - drag.x) * direction.x, MIN_WIDTH, MAX_WIDTH) } : drag.original.width,
+        height: direction.y ? resizedAxis(drag.height, drag.availableHeight, (e.clientY - drag.y) * direction.y, MIN_HEIGHT, MAX_HEIGHT) : drag.original.height,
+      }, false);
+    };
+    handle.onpointerup = (e) => { if (resizeDrag?.pointerId === e.pointerId) finishResize(true); };
+    handle.onpointercancel = () => finishResize(false);
+    handle.onlostpointercapture = () => finishResize(false);
+    handle.onkeydown = (e) => {
+      const dx = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      const dy = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+      if (!(dx && direction.x) && !(dy && direction.y)) return;
+      e.preventDefault();
+      finishResize(false);
+      const step = e.shiftKey ? 10 : 1;
+      setViewport({
+        width: dx && direction.x ? { kind: "pixels", value: Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, el("preview").clientWidth + dx * direction.x * step)) } : viewport.width,
+        height: dy && direction.y ? Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, el("preview").clientHeight + dy * direction.y * step)) : viewport.height,
+      });
+    };
+  }
+  updateSizeReadout();
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(updateSizeReadout).observe(el("preview"));
+  window.addEventListener("resize", () => { finishResize(false); updateSizeReadout(); });
 }
 // bgCanvas maps a bg choice to the canvas (#stage) backdrop. dark is kept
 // distinct from the preview surface so a resized preview stays visible on it.
@@ -413,6 +680,7 @@ function bgCanvas(label) {
   return "#0b0c10"; // dark
 }
 function setBg(label) {
+  finishResize(false);
   bg = label;
   setBgActive(label);
   el("stage").style.background = bgCanvas(label);
@@ -433,7 +701,9 @@ function stateString() {
     for (const [k, v] of Object.entries(args)) if (v != null && v !== "") p.set("arg." + k, v);
   }
   p.set("mode", mode);
-  p.set("w", widthLabel);
+  if (viewport.width.kind === "preset") p.set("w", viewport.width.label);
+  else p.set("px", String(viewport.width.value));
+  if (viewport.height !== null) p.set("h", String(viewport.height));
   p.set("bg", bg);
   return p.toString();
 }
@@ -443,13 +713,15 @@ function writeState() {
   try { localStorage.setItem("swapbook:last", s); } catch {}
 }
 function applyParams(str) {
+  finishResize(false);
   if (!str) return false;
   const p = new URLSearchParams(str);
   const story = allStories.find((s) => s.id === p.get("story"));
   if (!story) return false;
   const v = story.variants.find((x) => vName(x) === p.get("variant")) || story.variants[0];
   if (MODES.includes(p.get("mode"))) mode = p.get("mode");
-  const urlW = hasWidth(p.get("w")) ? p.get("w") : null;
+  const rawPixels = p.get("px");
+  const urlW = (rawPixels && /^\d+$/.test(rawPixels) ? parseWidth({ kind: "pixels", value: Number(rawPixels) }) : null) || parseWidth(p.get("w"));
   if (BGS.includes(p.get("bg"))) bg = p.get("bg");
   setModeActive(mode);
   setBgActive(bg);
@@ -460,9 +732,11 @@ function applyParams(str) {
   }
   const stateArgs = {};
   for (const [k, val] of p) if (k.startsWith("arg.")) stateArgs[k.slice(4)] = val;
-  // Pass the URL width down so the whole precedence rule (URL > remembered >
-  // full) lives in selectVariant; a shared link never mutates local memory.
-  selectVariant(story, v, stateArgs, urlW);
+  const rawHeight = p.get("h");
+  const height = rawHeight && /^\d+$/.test(rawHeight) ? parseHeight(Number(rawHeight)) : null;
+  const remembered = parseViewport(vwMem[story.id]);
+  const size = urlW || p.has("h") ? { width: urlW || remembered?.width || { kind: "preset", label: "full" }, height } : null;
+  selectVariant(story, v, stateArgs, size);
   return true;
 }
 
@@ -739,7 +1013,7 @@ copyLinkBtn.onclick = () => copyToClipboard(copyLinkBtn, location.href, "link �
 el("story-search").oninput = debounce(() => renderStories(currentStoryList()), 120);
 
 function moveStory(dir) {
-  const btns = [...qsa(".story")];
+  const btns = visibleStoryEntries();
   if (!btns.length) return;
   let i = btns.findIndex((b) => b.classList.contains("active"));
   i = i < 0 ? (dir > 0 ? 0 : btns.length - 1) : (i + dir + btns.length) % btns.length;
@@ -749,9 +1023,11 @@ document.addEventListener("keydown", (e) => {
   const active = /** @type {HTMLElement} */ (document.activeElement);
   const tag = active && active.tagName;
   const typing = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
+  if (e.key === "Escape" && resizeDrag) { e.preventDefault(); finishResize(false); return; }
   if (e.key === "Escape" && typing) return active.blur();
   if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.key === "/") { e.preventDefault(); return el("story-search").focus(); }
+  if (resizeDrag && (["j", "k", "m"].includes(e.key) || (e.key >= "1" && e.key <= "9"))) finishResize(false);
+  if (e.key === "/") { e.preventDefault(); setPanelVisible("sidebar", true); return el("story-search").focus(); }
   if (e.key === "j") { e.preventDefault(); return moveStory(1); }
   if (e.key === "k") { e.preventDefault(); return moveStory(-1); }
   if (e.key >= "1" && e.key <= "9") {

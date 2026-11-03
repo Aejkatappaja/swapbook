@@ -67,6 +67,27 @@ Any viewports set via `reg.Viewports` appear in the toolbar's width bar next to
 the built-ins; the width you pick is remembered per story. Other stacks emit the
 same `viewports` list in their manifest.
 
+Click a group heading to collapse or expand its stories. Within a group, click a component heading to collapse its docs and variants into one row. Both levels remember their state independently in this browser; filtering temporarily reveals matching components and groups.
+
+Use **hide stories** in the sidebar to give the preview more space. When the
+sidebar is collapsed, a slim rail keeps the logo, a **show stories** button, and the current position within the visible story entries. Use **hide inspector**
+beside **clear** in the bottom panel to collapse its content. The collapsed inspector keeps its
+tab bar at the bottom of the screen. Use **show inspector** beside **clear** to
+reopen its content. Panel visibility is remembered on this browser. Press `/` to
+reopen the sidebar and search.
+
+Drag any edge of the preview to change its width or height. Drag a corner to
+change both. The preview stays centered while it fits, and oversized dimensions
+scroll from the top-left. The toolbar reports the actual width × height in pixels.
+Manual widths range from 240 to 3840 pixels, and heights from 160 to 2160 pixels.
+
+Focus a handle and use the arrow keys to change that dimension by one pixel, or hold
+Shift for ten pixels. Corner handles support both axes. Press Escape during a
+drag to restore both dimensions. Width presets preserve the selected height.
+Use **fit height** to fill the available height again; **full** fills the available
+width. Both dimensions are remembered per story and included in shared links.
+Resizing keeps the current preview loaded.
+
 ## How it works
 
 Every request that is not part of the gallery UI is proxied to your app
