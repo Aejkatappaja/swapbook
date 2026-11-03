@@ -67,9 +67,11 @@ Any viewports set via `reg.Viewports` appear in the toolbar's width bar next to
 the built-ins; the width you pick is remembered per story. Other stacks emit the
 same `viewports` list in their manifest.
 
-Use **hide stories** or **hide inspector** in the toolbar to give the preview more
-space. The buttons stay visible so you can reopen either panel. Panel visibility
-is remembered on this browser. Press `/` to reopen the sidebar and search.
+Use **hide stories** in the toolbar or **hide inspector** beside **clear** in the
+bottom panel to give the preview more space. The collapsed inspector keeps its
+tab bar at the bottom of the screen. Use **show inspector** beside **clear** to
+reopen its content. Panel visibility is remembered on this browser. Press `/` to
+reopen the sidebar and search.
 
 Drag any edge of the preview to change its width or height. Drag a corner to
 change both. The preview stays centered while it fits, and oversized dimensions

@@ -25,11 +25,14 @@ test("panels free space, stay reopenable, and persist", async ({ page }) => {
   await expect(page.locator("#sidebar")).toBeHidden();
   await expect.poll(() => pixels(page)).toBe(width + 248);
   await page.getByRole("button", { name: "hide inspector", exact: true }).click();
-  await expect(page.locator("#inspector")).toBeHidden();
-  expect((await page.locator("#preview").boundingBox()).height).toBeGreaterThanOrEqual(height + 232);
+  await expect(page.locator("#inspector .ins-head")).toBeVisible();
+  await expect(page.locator("#events")).toBeHidden();
+  const collapsedHeight = (await page.locator("#inspector").boundingBox()).height;
+  expect((await page.locator("#preview").boundingBox()).height).toBeGreaterThanOrEqual(height + 232 - collapsedHeight);
   await page.reload();
   await expect(page.locator("#sidebar")).toBeHidden();
-  await expect(page.locator("#inspector")).toBeHidden();
+  await expect(page.locator("#inspector .ins-head")).toBeVisible();
+  await expect(page.locator("#events")).toBeHidden();
   const reopen = page.getByRole("button", { name: "show inspector", exact: true });
   await reopen.focus();
   await page.keyboard.press("Enter");
@@ -314,3 +317,29 @@ for (const saved of ["phone", { kind: "pixels", value: 641 }]) {
     await expect(page.locator("#fit-height")).toHaveAttribute("aria-pressed", "true");
   });
 }
+
+
+test("collapsed inspector keeps its tabs and toggle beside clear", async ({ page }) => {
+  await page.route("**/__sb/api/manifest", async (route) => {
+    const manifest = await (await route.fetch()).json();
+    manifest.stories.find((story) => story.id === "play").variants = [{ name: "default", docs: "Inspector documentation" }];
+    await route.fulfill({ json: manifest });
+  });
+  await start(page);
+  const header = page.locator("#inspector .ins-head");
+  const toggle = header.locator("#toggle-inspector");
+  await expect(toggle).toHaveText("hide inspector");
+  expect(await page.locator("#clear").evaluate((button) => button.nextElementSibling.id)).toBe("toggle-inspector");
+  await header.getByRole("button", { name: "docs", exact: true }).click();
+  await expect(page.locator("#docs")).toHaveText("Inspector documentation");
+  await toggle.click();
+  await expect(toggle).toHaveText("show inspector");
+  await expect(toggle).toBeFocused();
+  for (const tab of ["network", "a11y", "docs"]) await expect(header.locator(`[data-tab="${tab === "network" ? "net" : tab}"]`)).toBeVisible();
+  await expect(page.locator("#docs")).toBeHidden();
+  const box = await header.boundingBox();
+  expect(Math.round(box.y + box.height)).toBe(page.viewportSize().height);
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#docs")).toBeVisible();
+  await expect(page.locator("#docs")).toHaveText("Inspector documentation");
+});

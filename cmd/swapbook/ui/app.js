@@ -478,10 +478,11 @@ function setViewport(choice, persist = true) {
 /** @param {keyof PanelVisibility} panel @param {boolean} visible @param {boolean} [persist] */
 function setPanelVisible(panel, visible, persist = true) {
   finishResize(false);
-  panels[panel] = visible;
-  el(panel).hidden = !visible;
-  document.body.classList.toggle("sidebar-hidden", !panels.sidebar);
   const button = el("toggle-" + panel);
+  panels[panel] = visible;
+  if (panel === "inspector") el(panel).classList.toggle("collapsed", !visible);
+  else el(panel).hidden = !visible;
+  document.body.classList.toggle("sidebar-hidden", !panels.sidebar);
   button.textContent = (visible ? "hide " : "show ") + (panel === "sidebar" ? "stories" : "inspector");
   button.setAttribute("aria-expanded", String(visible));
   if (persist) {

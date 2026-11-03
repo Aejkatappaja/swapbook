@@ -233,13 +233,15 @@ main { position: relative; z-index: 1; display: flex; flex-direction: column; mi
   height: 232px; display: flex; flex-direction: column;
   background: var(--bg-float);
 }
+#inspector.collapsed { height: auto; }
+#inspector.collapsed > .panel { display: none !important; }
 #inspector::before {
   content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cyan) 50%, transparent), color-mix(in srgb, var(--purple) 35%, transparent), transparent);
   box-shadow: 0 0 10px color-mix(in srgb, var(--cyan) 22%, transparent);
 }
 .ins-head {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
   padding: 6px 12px; font-size: 12px;
   border-bottom: 1px solid var(--border);
 }
