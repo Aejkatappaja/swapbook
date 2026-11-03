@@ -479,11 +479,17 @@ function setViewport(choice, persist = true) {
 function setPanelVisible(panel, visible, persist = true) {
   finishResize(false);
   const button = el("toggle-" + panel);
+  const hadFocus = document.activeElement === button || (panel === "sidebar" && document.activeElement === el("show-sidebar"));
   panels[panel] = visible;
   if (panel === "inspector") el(panel).classList.toggle("collapsed", !visible);
   else el(panel).hidden = !visible;
   document.body.classList.toggle("sidebar-hidden", !panels.sidebar);
-  button.textContent = (visible ? "hide " : "show ") + (panel === "sidebar" ? "stories" : "inspector");
+  if (panel === "sidebar") {
+    const reopen = el("show-sidebar");
+    reopen.hidden = visible;
+    reopen.setAttribute("aria-expanded", String(visible));
+    if (hadFocus) (visible ? button : reopen).focus();
+  } else button.textContent = (visible ? "hide " : "show ") + "inspector";
   button.setAttribute("aria-expanded", String(visible));
   if (persist) {
     try { localStorage.setItem(PANELS_KEY, JSON.stringify(panels)); } catch {}
@@ -529,6 +535,7 @@ function initWorkbench() {
     setPanelVisible(panel, panels[panel], false);
     el("toggle-" + panel).onclick = () => setPanelVisible(panel, !panels[panel]);
   }
+  el("show-sidebar").onclick = () => setPanelVisible("sidebar", true);
   el("fit-height").onclick = () => {
     finishResize(false);
     setViewport({ width: viewport.width, height: null });

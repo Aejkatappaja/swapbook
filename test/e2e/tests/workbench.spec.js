@@ -343,3 +343,27 @@ test("collapsed inspector keeps its tabs and toggle beside clear", async ({ page
   await expect(page.locator("#docs")).toBeVisible();
   await expect(page.locator("#docs")).toHaveText("Inspector documentation");
 });
+
+
+test("sidebar hide control stays inside and toolbar reopens it with keyboard focus", async ({ page }) => {
+  await start(page);
+  const hide = page.locator("#sidebar").getByRole("button", { name: "hide stories", exact: true });
+  const show = page.locator("#toolbar").getByRole("button", { name: "show stories", exact: true });
+  await expect(hide).toBeVisible();
+  await expect(show).toBeHidden();
+  await hide.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#sidebar")).toBeHidden();
+  await expect(show).toBeFocused();
+  await expect(show).toHaveAttribute("aria-expanded", "false");
+  await page.keyboard.press("Enter");
+  await expect(hide).toBeFocused();
+  await expect(show).toBeHidden();
+  await hide.click();
+  await page.reload();
+  await expect(show).toBeVisible();
+  await expect(page.locator("#sidebar")).toBeHidden();
+  await show.click();
+  await expect(hide).toBeVisible();
+  await expect(show).toBeHidden();
+});

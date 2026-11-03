@@ -23,6 +23,7 @@
     <span class="brand-wm">~<span class="slash">/</span>swapbook</span>
   </div>
   <div class="brand-sub">// component workbench</div>
+  <button id="toggle-sidebar" aria-controls="sidebar" aria-expanded="true">hide stories</button>
   <input id="story-search" type="search" placeholder="filter stories…" autocomplete="off" spellcheck="false">
   <nav id="stories">loading…</nav>
   <div class="side-foot" id="status"><span class="dot ok">●</span> <span class="status-txt">ready</span></div>
@@ -32,7 +33,7 @@
   <header id="toolbar">
     <span id="current"><span class="p">$</span> select a story</span>
     <div class="tools">
-      <button id="toggle-sidebar" aria-controls="sidebar" aria-expanded="true">hide stories</button>
+      <button id="show-sidebar" aria-controls="sidebar" aria-expanded="false" hidden>show stories</button>
       <div class="seg"><span class="seg-label">mode</span><div class="modes" id="modes"></div></div>
       <div class="seg"><span class="seg-label">width</span><div class="widths" id="widths"></div><output id="width-readout" aria-label="Preview dimensions"></output><button id="fit-height" title="Fill the available preview height" aria-pressed="true">fit height</button></div>
       <div class="seg"><span class="seg-label">bg</span><div class="bgs" id="bgs"></div></div>

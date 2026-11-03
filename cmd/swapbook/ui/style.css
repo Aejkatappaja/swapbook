@@ -68,6 +68,7 @@ body::after {
   border-right: 1px solid var(--border);
   overflow-y: auto;
 }
+#sidebar #toggle-sidebar { align-self: flex-start; margin: 0 12px 8px; }
 .brand {
   display: flex; align-items: center; gap: 10px;
   padding: 15px 16px 4px;
@@ -144,13 +145,13 @@ main { position: relative; z-index: 1; display: flex; flex-direction: column; mi
 .seg-label { color: var(--comment); font-size: 11px; }
 .modes, .widths, .bgs { flex-wrap: wrap; display: flex; gap: 4px; }
 
-.widths button, .modes button, .bgs button, #clear, #run-play, #open-tab, #copy-link, #toggle-sidebar, #toggle-inspector, #fit-height {
+.widths button, .modes button, .bgs button, #clear, #run-play, #open-tab, #copy-link, #toggle-sidebar, #show-sidebar, #toggle-inspector, #fit-height {
   background: var(--bg-elev); border: 1px solid var(--border); color: var(--fg-dim);
   font: inherit; font-size: 12px; padding: 3px 10px; border-radius: var(--r);
   cursor: pointer; transition: border-color var(--t), color var(--t), background var(--t);
 }
 .widths button:hover, .modes button:hover, .bgs button:hover,
-#clear:hover, #run-play:hover, #open-tab:hover, #copy-link:hover, #toggle-sidebar:hover, #toggle-inspector:hover, #fit-height:hover {
+#clear:hover, #run-play:hover, #open-tab:hover, #copy-link:hover, #toggle-sidebar:hover, #show-sidebar:hover, #toggle-inspector:hover, #fit-height:hover {
   color: var(--fg-bright); border-color: var(--cyan);
 }
 .widths button.active, .bgs button.active { color: var(--fg-bright); border-color: var(--cyan); background: var(--bg-cursor); }
